@@ -45,36 +45,7 @@ allowed-tools:
 
 **Onboard 例外**：Onboard 是交互式的（需要问用户问题），不受"全自动"约束。Onboard 完成后回到全自动管道。
 
-**辅助功能**（按需加载，不在主管道内）：
-- 用户说"重新设置风格" → `读取: {skill_dir}/references/onboard.md`
-- 用户说"学习我的修改" → `读取: {skill_dir}/references/learn-edits.md`。支持两种来源：
-  - **本地修改**（默认）：用户在 `output/` 的 markdown 文件中修改
-  - **微信草稿箱同步**：`python3 {skill_dir}/scripts/learn_edits.py --from-wechat`，自动从草稿箱拉回最新内容，与本地原文做纯文本 diff
-- 用户说"学习排版"/"学排版" → `python3 {skill_dir}/scripts/learn_theme.py <url> --name <name>`，用户需提供一个公众号文章 URL 和主题名称。提取完成后提示用户设置 `style.yaml` 的 `theme` 字段。
-- 用户说"学习这篇文章"/"导入范文" + URL → `python3 {skill_dir}/scripts/fetch_article.py <url> -o /tmp/article.md && python3 {skill_dir}/scripts/extract_exemplar.py /tmp/article.md -s <账号名>`，从公众号文章 URL 提取正文并导入范文库。支持三级降级（requests → Playwright → 手动 HTML）。
-- 用户说"看看文章数据" → `读取: {skill_dir}/references/effect-review.md`
-- 用户说"检查一下"/"自检"/"这篇文章怎么样" → 对最近一篇生成的文章（或用户指定的文章）执行自检，输出生成报告：
-
-  **第一部分：生成档案**（告诉用户这篇文章是怎么来的）
-  1. 读取 `history.yaml` 最近一条记录，提取：
-     - 使用的框架类型 + 写作人格
-     - 激活的维度随机化组合
-     - 素材采集来源（WebSearch 还是降级到 LLM）
-     - 内容增强策略（角度发现/密度强化/细节锚定/真实体感）
-     - 范文风格库是否命中（用了哪几篇 exemplar，还是 fallback 到种子）
-     - playbook 中生效的规则条数
-  2. 如果 history.yaml 无记录或用户指定了外部文章 → 跳过此部分，提示"这篇文章不是 WeWrite 生成的，只做质量检查"
-
-  **第二部分：质量检查**（告诉用户哪里还能改）
-  1. `python3 {skill_dir}/scripts/humanness_score.py {article_path} --json`
-  2. Agent 解读 JSON 中每项得分，翻译为用户可操作的建议，格式：
-     - 每条建议定位到具体段落或句子（"第 3 段连续 4 句长度接近"）
-     - 给出具体改法（"建议把第 3 句拆成两个短句"、"这里可以加一句你自己的感受"）
-     - 按影响度排序，最多 5 条
-  3. 如果所有项得分都不错 → "这篇文章质量不错，建议在编辑锚点处加入你的个人内容就可以发了。"
-
-  **输出格式**：自然语言报告，不输出 JSON 或分数（用户不需要看数字）
-- 用户说"更新"/"更新 WeWrite"/"升级" → 在 `{skill_dir}` 执行 `git pull origin main`，完成后告知版本变化
+**辅助功能 / 非管道命令**（按需加载）：用户发出"选题→发布"主流程之外的命令——重新设置风格 / 学习我的修改 / 学习排版 / 导入范文·学习这篇文章 / 查看范文库 / 看看文章数据 / 主题画廊 / 小绿书 / 更新 / 检查一下·自检——时 → `读取: {skill_dir}/references/commands.md`，按其中「触发词 → 动作」表执行。
 
 ---
 
@@ -482,18 +453,12 @@ python3 {skill_dir}/toolkit/cli.py preview {markdown} --theme {theme} --no-open 
 | 用户说 | 动作 |
 |--------|------|
 | 润色/缩写/扩写/换语气 | 编辑文章 |
-| 封面换暖色调 | 重新生图 |
+| 封面换暖色调等 | 重新生图 |
 | 用框架 B 重写 | 回到 Step 4 |
 | 换一个选题 | 回到 Step 2.3 |
-| 看看有什么主题 | `python3 {skill_dir}/toolkit/cli.py gallery` |
 | 换成 XX 主题 | 重新渲染 |
-| 看看文章数据 | `读取: {skill_dir}/references/effect-review.md` |
-| 学习我的修改 | `读取: {skill_dir}/references/learn-edits.md`。支持本地 markdown 修改和微信草稿箱同步（`--from-wechat`） |
-| 学习排版 / 学排版 | `python3 {skill_dir}/scripts/learn_theme.py <url> --name <name>` |
-| 做一个小绿书/图片帖 | `python3 {skill_dir}/toolkit/cli.py image-post img1.jpg img2.jpg -t "标题"` |
-| 检查一下 / 自检 / 这篇文章怎么样 | 生成报告（生成档案 + 质量检查，见辅助功能） |
-| 导入范文 / 建范文库 | `python3 {skill_dir}/scripts/extract_exemplar.py article.md` |
-| 查看范文库 | `python3 {skill_dir}/scripts/extract_exemplar.py --list` |
+
+其余非管道命令（学习我的修改 / 学习排版 / 导入范文 / 查看范文库 / 看看文章数据 / 主题画廊 / 小绿书 / 检查一下）→ `读取: {skill_dir}/references/commands.md`。
 
 ---
 
