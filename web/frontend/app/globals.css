@@ -101,3 +101,11 @@ pre.md { background: #0b0d11; border: 1px solid var(--border); border-radius: 8p
 
 .ok { color: var(--accent-2); }
 .warn { color: #ffcf5c; }
+
+.platform-versions { display: grid; gap: 12px; margin-top: 16px; }
+.version-card { border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.version-head { display: flex; gap: 8px; align-items: center; }
+.pv-badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; }
+.pv-badge.pv-ok { background: #163; color: #cfe; }
+.pv-badge.pv-warn { background: #531; color: #fda; }
+.version-md { white-space: pre-wrap; background: var(--panel-2); padding: 8px; border-radius: 6px; max-height: 360px; overflow: auto; }

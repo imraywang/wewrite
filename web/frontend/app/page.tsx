@@ -13,9 +13,11 @@ import {
   getJob,
   getPersonas,
   getThemes,
+  startDistribute,
   streamJob,
 } from "@/lib/api";
 import PublishPanel from "@/components/PublishPanel";
+import PlatformVersions from "@/components/PlatformVersions";
 
 type LogLine = { kind: string; text: string };
 
@@ -44,16 +46,31 @@ export default function HomePage() {
   const logRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<(() => void) | null>(null);
 
+  // 带稿来 / 多平台分发
+  const [srcText, setSrcText] = useState("");
+  const [distributing, setDistributing] = useState(false);
+  const [distLines, setDistLines] = useState<LogLine[]>([]);
+  const [distResult, setDistResult] = useState<JobDetail | null>(null);
+  const distLogRef = useRef<HTMLDivElement>(null);
+  const distCancelRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
     getPersonas().then(setPersonas).catch(() => {});
     getThemes().then(setThemes).catch(() => {});
     getAccount().then(setAccount).catch(() => {});
-    return () => cancelRef.current?.();
+    return () => {
+      cancelRef.current?.();
+      distCancelRef.current?.();
+    };
   }, []);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [lines]);
+
+  useEffect(() => {
+    if (distLogRef.current) distLogRef.current.scrollTop = distLogRef.current.scrollHeight;
+  }, [distLines]);
 
   function push(kind: string, text: string) {
     setLines((prev) => [...prev, { kind, text }]);
@@ -89,6 +106,83 @@ export default function HomePage() {
           }`
         );
         break;
+    }
+  }
+
+  function pushDist(kind: string, text: string) {
+    setDistLines((prev) => [...prev, { kind, text }]);
+  }
+
+  function renderDistEvent(e: JobEvent) {
+    switch (e.type) {
+      case "status":
+        pushDist("step", `状态：${e.status}${e.error ? " — " + e.error : ""}`);
+        break;
+      case "log":
+        pushDist("log", String(e.text ?? ""));
+        break;
+      case "notice":
+        pushDist("notice", `提示：${e.text}`);
+        break;
+      case "assistant_text":
+        pushDist("log", String(e.text ?? ""));
+        break;
+      case "tool_use":
+        pushDist("tool", `🔧 ${e.name}${e.detail ? "  " + e.detail : ""}`);
+        break;
+      case "tool_result":
+        if (e.is_error) pushDist("err", "工具返回错误");
+        break;
+    }
+  }
+
+  async function trackDistributeJob(jobId: string) {
+    setDistLines([]);
+    setDistResult(null);
+    setDistributing(true);
+    pushDist("step", `分发任务已创建：${jobId}`);
+    distCancelRef.current = streamJob(
+      jobId,
+      renderDistEvent,
+      async () => {
+        try {
+          const detail = await getJob(jobId);
+          setDistResult(detail);
+          if (detail.completion)
+            pushDist("step", COMPLETION_TEXT[detail.completion] ?? detail.completion);
+        } catch (err) {
+          pushDist("err", String(err));
+        }
+        setDistributing(false);
+      }
+    );
+  }
+
+  async function onDistributeFromResult() {
+    if (!result?.id) return;
+    try {
+      const job = await startDistribute({
+        source_job_id: result.id,
+        platforms: ["xiaohongshu", "douyin"],
+      });
+      await trackDistributeJob(job.id);
+    } catch (err) {
+      pushDist("err", String(err));
+      setDistributing(false);
+    }
+  }
+
+  async function onDistributeFromText() {
+    if (!srcText.trim()) return;
+    try {
+      const job = await startDistribute({
+        source_text: srcText,
+        platforms: ["xiaohongshu", "douyin"],
+      });
+      await trackDistributeJob(job.id);
+    } catch (err) {
+      pushDist("err", String(err));
+      setDistributing(false);
     }
   }
 
@@ -294,8 +388,75 @@ export default function HomePage() {
           )}
 
           {result.article_markdown && <PublishPanel jobId={result.id} />}
+
+          {result.article_markdown && (
+            <div style={{ marginTop: 16 }}>
+              <button
+                className="btn secondary"
+                onClick={onDistributeFromResult}
+                disabled={distributing}
+              >
+                {distributing ? "分发中…" : "分发到多平台（小红书 + 抖音）"}
+              </button>
+            </div>
+          )}
+
+          {result.platform_versions && result.platform_versions.length > 0 && (
+            <PlatformVersions versions={result.platform_versions} />
+          )}
         </div>
       )}
+
+      {/* 分发任务进度 */}
+      {(distLines.length > 0 || distributing) && (
+        <div className="panel">
+          <h2>
+            分发进度{" "}
+            {distributing && <span className="badge running">running</span>}
+          </h2>
+          <div className="log" ref={distLogRef}>
+            {distLines.map((l, i) => (
+              <div key={i} className={`line ${l.kind}`}>
+                {l.text}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 分发结果（多平台版本） */}
+      {distResult && distResult.platform_versions && distResult.platform_versions.length > 0 && (
+        <div className="panel">
+          <h2>
+            多平台版本{" "}
+            <span className={`badge ${distResult.status}`}>{distResult.status}</span>
+          </h2>
+          {distResult.error && <p className="log err">{distResult.error}</p>}
+          <PlatformVersions versions={distResult.platform_versions} />
+        </div>
+      )}
+
+      {/* 带稿来：直接粘贴正文进行多平台分发 */}
+      <div className="panel">
+        <h2>带稿来 · 直接分发已有文章</h2>
+        <p className="hint">粘贴任意文章正文，自动改写为小红书和抖音风格版本。</p>
+        <label>文章正文（Markdown 或纯文本）</label>
+        <textarea
+          value={srcText}
+          onChange={(e) => setSrcText(e.target.value)}
+          placeholder="在此粘贴文章内容…"
+          style={{ minHeight: 140 }}
+        />
+        <div style={{ marginTop: 12 }}>
+          <button
+            className="btn"
+            onClick={onDistributeFromText}
+            disabled={distributing || !srcText.trim()}
+          >
+            {distributing ? "分发中…" : "开始分发"}
+          </button>
+        </div>
+      </div>
     </>
   );
 }

@@ -55,6 +55,21 @@ export type JobSummary = {
   created_at: number;
   completion?: string | null;
 };
+export type PlatformVersion = {
+  platform: string;
+  label: string;
+  output_kind: string;
+  title: string;
+  markdown: string;
+  images: string[];
+  tags: string[];
+  humanness: number | null;
+  max_similarity: number | null;
+  passed: boolean;
+  warning: string;
+  status: string;
+};
+
 export type JobDetail = JobSummary & {
   error?: string | null;
   title?: string | null;
@@ -62,6 +77,7 @@ export type JobDetail = JobSummary & {
   preview_html?: string | null;
   images?: string[];
   events: JobEvent[];
+  platform_versions?: PlatformVersion[];
 };
 
 // 产物 URL：后端返回相对 /artifacts/...，前端按需补上 API_BASE。
@@ -135,6 +151,21 @@ export const publishTo = (
   platform: string,
   payload: { job_id?: string; note?: NoteInput }
 ) => apiSend<PublishResponse>(`/api/publish/${platform}`, "POST", payload);
+
+// ---- 多平台改写分发 ----
+export const fetchPlatforms = () =>
+  apiGet<{ id: string; label: string; description: string }[]>("/api/catalog/platforms");
+
+export async function startDistribute(body: {
+  source_job_id?: string;
+  source_text?: string;
+  source_url?: string;
+  platforms: string[];
+  persona?: string;
+  theme?: string;
+}) {
+  return apiSend<JobSummary>("/api/distribute", "POST", body);
+}
 
 // 订阅任务进度。返回取消函数。
 export function streamJob(
