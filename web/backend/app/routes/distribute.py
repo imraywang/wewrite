@@ -6,16 +6,13 @@ import subprocess
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..agent_runner import run_distribute_job
+from ..agent_runner import submit_distribute
 from ..config import get_settings
 from ..models import DistributeRequest, JobSummary
 from ..store import STORE
 from . import current_user
 
 router = APIRouter(prefix="/api/distribute", tags=["distribute"])
-
-# 持有后台任务引用，防止任务完成前被 asyncio 弱引用回收（jobs.py 亦有同款模式，待统一）
-_BG_TASKS: set[asyncio.Task] = set()
 
 
 def _fetch_url_sync(url: str) -> str:
@@ -62,8 +59,6 @@ async def distribute(req: DistributeRequest, user_id: str = Depends(current_user
         target_platforms=req.platforms, persona=req.persona, theme=req.theme,
         source_image_paths=source_imgs,
     )
-    task = asyncio.create_task(run_distribute_job(job))
-    _BG_TASKS.add(task)
-    task.add_done_callback(_BG_TASKS.discard)
+    submit_distribute(job)
     return JobSummary(id=job.id, status=job.status, prompt=job.prompt,
                       created_at=job.created_at, completion=job.completion, kind=job.kind)

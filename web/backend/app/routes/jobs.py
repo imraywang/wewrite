@@ -7,7 +7,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sse_starlette.sse import EventSourceResponse
 
-from ..agent_runner import run_job
+from ..agent_runner import submit_generate
 from ..models import CreateJobRequest, JobSummary
 from ..store import STORE, Job
 from . import current_user
@@ -36,8 +36,7 @@ async def create_job(req: CreateJobRequest, user_id: str = Depends(current_user)
         persona=req.persona,
         publish_draft=req.publish_draft,
     )
-    # 后台执行；事件经 SSE 推送
-    asyncio.create_task(run_job(job))
+    submit_generate(job)
     return _summary(job)
 
 

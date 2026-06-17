@@ -244,3 +244,22 @@ def _seed_source_images(job: Job, ws: Path) -> None:
                 shutil.copy2(src, ws / "output" / src.name)
             except OSError:
                 continue
+
+
+# ---- 调度入口（路由调这两个，取代旧的 asyncio.create_task(run_*)）----
+from functools import lru_cache as _lru_cache
+
+
+@_lru_cache
+def _scheduler():
+    from .config import get_settings
+    from .scheduler import Scheduler
+    return Scheduler(get_settings())
+
+
+def submit_generate(job) -> None:
+    _scheduler().submit(job)
+
+
+def submit_distribute(job) -> None:
+    _scheduler().submit(job)
