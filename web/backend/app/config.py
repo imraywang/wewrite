@@ -21,6 +21,9 @@ class Settings:
         self.image_provider: str = os.environ.get("WEWRITE_IMAGE_PROVIDER", "")
         self.image_api_key: str = os.environ.get("WEWRITE_IMAGE_API_KEY", "")
         self.image_secret_key: str = os.environ.get("WEWRITE_IMAGE_SECRET_KEY", "")
+        # 自定义图片服务（如 Sub2API 网关）的 base_url 与模型
+        self.image_base_url: str = os.environ.get("WEWRITE_IMAGE_BASE_URL", "")
+        self.image_model: str = os.environ.get("WEWRITE_IMAGE_MODEL", "")
 
         self.app_secret_key: str = os.environ.get("APP_SECRET_KEY", "")
 
@@ -56,6 +59,10 @@ class Settings:
         if not self.image_provider or not self.image_api_key:
             return None
         cfg: dict = {"provider": self.image_provider, "api_key": self.image_api_key}
+        if self.image_base_url:
+            cfg["base_url"] = self.image_base_url
+        if self.image_model:
+            cfg["model"] = self.image_model
         if self.image_secret_key:
             cfg["secret_key"] = self.image_secret_key
         return cfg

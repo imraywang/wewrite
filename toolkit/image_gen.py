@@ -147,10 +147,17 @@ def _size_to_aspect(size: str) -> str:
 
 
 def _download_image(url: str) -> bytes:
-    """Download image bytes from URL."""
-    resp = requests.get(url, timeout=60)
-    resp.raise_for_status()
-    return resp.content
+    """Download image bytes from URL, retrying transient TLS/network blips."""
+    last_err = None
+    for attempt in range(3):
+        try:
+            resp = requests.get(url, timeout=60)
+            resp.raise_for_status()
+            return resp.content
+        except requests.exceptions.RequestException as e:
+            last_err = e
+            time.sleep(1.5 * (attempt + 1))
+    raise last_err
 
 
 # --- Provider abstraction ---
@@ -612,6 +619,75 @@ class JimengProvider(ImageProvider):
         raise ValueError("Jimeng polling timeout")
 
 
+class Sub2APIProvider(ImageProvider):
+    """Sub2API 网关（如 relay.upthos.com）—— 异步图片任务流，用于 gpt-image-2。
+
+    提交 POST /v1/images/tasks → 轮询 GET /v1/images/tasks/{id} 直到 completed，
+    再下载 result.images[0].url[0]。size 转成宽高比（1:1/16:9/...），resolution 默认 1k。
+    """
+
+    provider_key = "sub2api"
+
+    def __init__(self, api_key: str, model: str = "gpt-image-2",
+                 base_url: str = "https://relay.upthos.com",
+                 resolution: str = "1k", poll_interval: float = 3.0,
+                 timeout: float = 300.0, **_kw):
+        self._api_key = api_key
+        self._model = model
+        # 接受 "https://host" 或 "https://host/v1"，统一成 host 根
+        base = base_url.rstrip("/")
+        if base.endswith("/v1"):
+            base = base[:-len("/v1")]
+        self._base_url = base
+        self._resolution = resolution
+        self._poll_interval = poll_interval
+        self._timeout = timeout
+
+    def generate(self, prompt: str, size: str) -> bytes:
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self._api_key}",
+        }
+        body = {
+            "model": self._model,
+            "prompt": prompt,
+            "n": 1,
+            "size": _size_to_aspect(size),
+            "resolution": self._resolution,
+        }
+        resp = requests.post(f"{self._base_url}/v1/images/tasks",
+                             headers=headers, json=body, timeout=60)
+        if resp.status_code != 200:
+            raise ValueError(f"Sub2API submit error ({resp.status_code}): "
+                             f"{_sanitize_for_log(resp.text)[:300]}")
+        data = (resp.json() or {}).get("data") or []
+        task_id = data[0].get("task_id") if data else None
+        if not task_id:
+            raise ValueError(f"Sub2API: no task_id in response: {resp.text[:300]}")
+
+        deadline = time.time() + self._timeout
+        while time.time() < deadline:
+            time.sleep(self._poll_interval)
+            poll = requests.get(f"{self._base_url}/v1/images/tasks/{task_id}",
+                                headers=headers, timeout=30)
+            if poll.status_code != 200:
+                raise ValueError(f"Sub2API poll error ({poll.status_code}): "
+                                 f"{_sanitize_for_log(poll.text)[:300]}")
+            task = (poll.json() or {}).get("data") or {}
+            status = task.get("status")
+            if status == "completed":
+                images = (task.get("result") or {}).get("images") or []
+                urls = images[0].get("url") if images else None
+                if not urls:
+                    raise ValueError(f"Sub2API: completed but no image URL: {poll.text[:300]}")
+                return _download_image(urls[0])
+            if status == "failed":
+                err = task.get("error") or {}
+                raise ValueError(f"Sub2API task failed: {err.get('message') or err}")
+            # submitted / processing → 继续轮询
+        raise ValueError(f"Sub2API: task {task_id} timed out after {self._timeout:.0f}s")
+
+
 # --- Provider registry ---
 
 PROVIDERS = {
@@ -624,6 +700,7 @@ PROVIDERS = {
     "azure_openai": AzureOpenAIProvider,
     "openrouter": OpenRouterProvider,
     "jimeng": JimengProvider,
+    "sub2api": Sub2APIProvider,
 }
 
 
