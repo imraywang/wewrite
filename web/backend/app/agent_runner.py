@@ -11,8 +11,8 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-from .config import Settings, get_settings
-from .platforms import HUMANNESS_THRESHOLD, MAX_REWRITE_RETRIES, SIMILARITY_THRESHOLD, get_profile
+from .config import get_settings
+from .platforms import HUMANNESS_THRESHOLD, SIMILARITY_THRESHOLD
 from .store import Job
 
 _IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif")
@@ -132,7 +132,7 @@ def _pick_article(out: Path) -> Optional[Path]:
 
     不能盲取最近修改的 .md —— 管道在正文之后常会再写辅助产物（配图提示词包、SEO 备注），
     那些 mtime 更新，会被误当成正文。选取顺序：
-      1) 约定的固定名 output/article.md（_build_prompt 已要求 agent 这样存）；
+      1) 约定的固定名 output/article.md（pipeline 的 generate_user_prompt 已要求 agent 这样存）；
       2) 排除 assets/ 子目录与明显的辅助产物后，取最新的 .md；
       3) 若全被排除（极端情况），兜底取最新的任意 .md。
     """
