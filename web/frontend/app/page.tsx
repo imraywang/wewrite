@@ -251,16 +251,16 @@ export default function HomePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-text">一句话，生成内容并一键分发多平台</h1>
-        <p className="mt-1 text-sm text-muted">
+        <h1 className="text-2xl font-semibold tracking-tight text-text">一句话，生成内容并一键分发多平台</h1>
+        <p className="mt-1 text-sm text-muted leading-relaxed">
           选题 → 写作 → 反 AI 与原创度把关 → 多平台智能改写 → 分发到公众号 · 小红书 · 抖音。
         </p>
       </div>
 
-      <Card className="space-y-4">
-        <h2 className="text-base font-semibold text-text">写什么</h2>
-        <div className="space-y-1">
-          <label className="text-sm text-muted">需求（一句话）</label>
+      <Card className="space-y-5">
+        <h2 className="text-base font-semibold tracking-tight text-text">写什么</h2>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted">需求（一句话）</label>
           <Textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
@@ -268,8 +268,8 @@ export default function HomePage() {
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <label className="text-sm text-muted">写作人格</label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted">写作人格</label>
             <Select
               value={persona}
               onValueChange={setPersona}
@@ -279,8 +279,8 @@ export default function HomePage() {
               ]}
             />
           </div>
-          <div className="space-y-1">
-            <label className="text-sm text-muted">排版主题</label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted">排版主题</label>
             <Select
               value={theme}
               onValueChange={setTheme}
@@ -331,7 +331,7 @@ export default function HomePage() {
       {(lines.length > 0 || running) && (
         <Card>
           <div className="mb-2 flex items-center gap-2">
-            <h2 className="text-base font-semibold text-text">实时进度</h2>
+            <h2 className="text-base font-semibold tracking-tight text-text">实时进度</h2>
             {running && <Badge tone="neutral">running</Badge>}
           </div>
           <div
@@ -348,9 +348,9 @@ export default function HomePage() {
       )}
 
       {result && (
-        <Card className="space-y-4">
+        <Card className="space-y-5">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold text-text">成稿</h2>
+            <h2 className="text-base font-semibold tracking-tight text-text">成稿</h2>
             <Badge
               tone={
                 result.status === "done"
@@ -459,7 +459,7 @@ export default function HomePage() {
       {(distLines.length > 0 || distributing) && (
         <Card>
           <div className="mb-2 flex items-center gap-2">
-            <h2 className="text-base font-semibold text-text">分发进度</h2>
+            <h2 className="text-base font-semibold tracking-tight text-text">分发进度</h2>
             {distributing && <Badge tone="neutral">running</Badge>}
           </div>
           <div
@@ -477,9 +477,9 @@ export default function HomePage() {
 
       {/* 分发结果（多平台版本） */}
       {distResult && distResult.platform_versions && distResult.platform_versions.length > 0 && (
-        <Card className="space-y-3">
+        <Card className="space-y-5">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold text-text">多平台版本</h2>
+            <h2 className="text-base font-semibold tracking-tight text-text">多平台版本</h2>
             <Badge
               tone={
                 distResult.status === "done"
@@ -502,11 +502,11 @@ export default function HomePage() {
       )}
 
       {/* 带稿来：直接粘贴正文进行多平台分发 */}
-      <Card className="space-y-3">
-        <h2 className="text-base font-semibold text-text">带稿来 · 直接分发已有文章</h2>
-        <p className="text-sm text-muted">粘贴任意文章正文，自动改写为小红书和抖音风格版本。</p>
-        <div className="space-y-1">
-          <label className="text-sm text-muted">文章正文（Markdown 或纯文本）</label>
+      <Card className="space-y-5">
+        <h2 className="text-base font-semibold tracking-tight text-text">带稿来 · 直接分发已有文章</h2>
+        <p className="text-sm text-muted leading-relaxed">粘贴任意文章正文，自动改写为小红书和抖音风格版本。</p>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted">文章正文（Markdown 或纯文本）</label>
           <Textarea
             value={srcText}
             onChange={(e) => setSrcText(e.target.value)}

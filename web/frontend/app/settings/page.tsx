@@ -99,8 +99,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-text">设置</h1>
-        <p className="mt-1 text-sm text-muted">配置一次，之后每篇文章自动沿用。</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-text">设置</h1>
+        <p className="mt-1 text-sm text-muted leading-relaxed">配置一次，之后每篇文章自动沿用。</p>
       </div>
 
       {msg && (
@@ -110,33 +110,33 @@ export default function SettingsPage() {
       )}
 
       <Card>
-        <h2 className="text-lg font-medium text-text mb-4">公众号风格</h2>
+        <h2 className="text-base font-semibold tracking-tight text-text mb-4">公众号风格</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-text">公众号名称</label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted">公众号名称</label>
             <Input
               value={accountName}
               onChange={(e) => setAccountName(e.target.value)}
             />
           </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-text">写作人格</label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted">写作人格</label>
             <Select
               value={persona}
               onValueChange={setPersona}
               options={personas.map((p) => ({ value: p.id, label: p.label, description: p.description }))}
             />
           </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-text">默认排版主题</label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted">默认排版主题</label>
             <Select
               value={theme}
               onValueChange={setTheme}
               options={themes.map((t) => ({ value: t.id, label: t.id, description: t.description || undefined }))}
             />
           </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-text">目标读者（可选）</label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted">目标读者（可选）</label>
             <Input
               value={audience}
               onChange={(e) => setAudience(e.target.value)}
@@ -144,8 +144,8 @@ export default function SettingsPage() {
             />
           </div>
         </div>
-        <div className="mt-4 space-y-1">
-          <label className="text-sm font-medium text-text">语气补充（可选）</label>
+        <div className="mt-4 space-y-1.5">
+          <label className="text-xs font-medium text-muted">语气补充（可选）</label>
           <Input
             value={tone}
             onChange={(e) => setTone(e.target.value)}
@@ -161,14 +161,14 @@ export default function SettingsPage() {
 
       <Card>
         <div className="flex items-center gap-2 mb-3">
-          <h2 className="text-lg font-medium text-text">微信公众号绑定</h2>
+          <h2 className="text-base font-semibold tracking-tight text-text">微信公众号绑定</h2>
           {account?.wechat_bound ? (
             <Badge tone="ok">已绑定</Badge>
           ) : (
             <Badge tone="neutral">未绑定</Badge>
           )}
         </div>
-        <p className="text-sm text-muted mb-4">
+        <p className="text-sm text-muted leading-relaxed mb-4">
           推送到<strong className="text-text">你自己的</strong>公众号草稿箱需要你自己的 appid/secret —— 这是平台无法代为提供的唯一一项。
           其余（LLM、AI 配图）均由平台统一承担，你无需任何配置。凭证将<strong className="text-text">加密存储</strong>，仅在生成时临时注入。
         </p>
@@ -182,18 +182,18 @@ export default function SettingsPage() {
             </Button>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-text">AppID</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted">AppID</label>
                 <Input
                   value={appid}
                   onChange={(e) => setAppid(e.target.value)}
                   placeholder="wx..."
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-text">AppSecret</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted">AppSecret</label>
                 <Input
                   type="password"
                   value={secret}
@@ -202,8 +202,8 @@ export default function SettingsPage() {
                 />
               </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-text">默认署名（可选）</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted">默认署名（可选）</label>
               <Input value={author} onChange={(e) => setAuthor(e.target.value)} />
             </div>
             <Button variant="primary" onClick={onBind} disabled={!appid || !secret}>
