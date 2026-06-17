@@ -8,21 +8,27 @@ export function Checkbox({
   onCheckedChange,
   children,
   id,
+  disabled,
 }: {
   checked: boolean;
   onCheckedChange: (c: boolean) => void;
   children?: ReactNode;
   id?: string;
+  disabled?: boolean;
 }) {
   return (
     <label
       htmlFor={id}
-      className="inline-flex cursor-pointer items-center gap-2 text-sm text-text"
+      className={cn(
+        "inline-flex items-center gap-2 text-sm text-text",
+        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+      )}
     >
       <BaseCheckbox.Root
         id={id}
         checked={checked}
         onCheckedChange={onCheckedChange}
+        disabled={disabled}
         className={cn(
           "flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border border-border bg-surface-2",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",

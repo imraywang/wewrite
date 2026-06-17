@@ -309,15 +309,14 @@ export default function HomePage() {
             交互模式（在选题/框架/配图处暂停确认）
           </Checkbox>
 
-          <div className={!canPublish ? "pointer-events-none opacity-50" : undefined}>
-            <Checkbox
-              id="publish"
-              checked={publishDraft && canPublish}
-              onCheckedChange={setPublishDraft}
-            >
-              完成后推送到我的公众号草稿箱
-            </Checkbox>
-          </div>
+          <Checkbox
+            id="publish"
+            checked={publishDraft && canPublish}
+            onCheckedChange={setPublishDraft}
+            disabled={!canPublish}
+          >
+            完成后推送到我的公众号草稿箱
+          </Checkbox>
         </div>
 
         {!canPublish && (
@@ -398,42 +397,10 @@ export default function HomePage() {
 
           {result.article_markdown ? (
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Tabs
-                  value={tab}
-                  onValueChange={(v) => setTab(v as "preview" | "markdown")}
-                  items={[
-                    {
-                      value: "preview",
-                      label: "微信预览",
-                      content:
-                        result.preview_html ? (
-                          <iframe
-                            className="h-[600px] w-full rounded-md border border-border"
-                            srcDoc={result.preview_html}
-                            title="preview"
-                          />
-                        ) : (
-                          <p className="text-sm text-muted">
-                            未生成预览 HTML（可切到 Markdown 查看正文）。
-                          </p>
-                        ),
-                    },
-                    {
-                      value: "markdown",
-                      label: "Markdown",
-                      content: (
-                        <pre className="overflow-x-auto whitespace-pre-wrap rounded-md bg-surface-2 p-4 text-xs text-text">
-                          {result.article_markdown}
-                        </pre>
-                      ),
-                    },
-                  ]}
-                />
+              <div className="flex justify-end">
                 <Button
                   variant="secondary"
                   size="sm"
-                  className="ml-auto shrink-0 self-start mt-1"
                   onClick={() =>
                     navigator.clipboard.writeText(result.article_markdown ?? "")
                   }
@@ -441,6 +408,36 @@ export default function HomePage() {
                   复制 Markdown
                 </Button>
               </div>
+              <Tabs
+                value={tab}
+                onValueChange={(v) => setTab(v as "preview" | "markdown")}
+                items={[
+                  {
+                    value: "preview",
+                    label: "微信预览",
+                    content: result.preview_html ? (
+                      <iframe
+                        className="h-[600px] w-full rounded-md border border-border"
+                        srcDoc={result.preview_html}
+                        title="preview"
+                      />
+                    ) : (
+                      <p className="text-sm text-muted">
+                        未生成预览 HTML（可切到 Markdown 查看正文）。
+                      </p>
+                    ),
+                  },
+                  {
+                    value: "markdown",
+                    label: "Markdown",
+                    content: (
+                      <pre className="overflow-x-auto whitespace-pre-wrap rounded-md bg-surface-2 p-4 text-xs text-text">
+                        {result.article_markdown}
+                      </pre>
+                    ),
+                  },
+                ]}
+              />
             </div>
           ) : (
             <p className="text-sm text-muted">未找到成稿文件。请查看上方进度日志排查。</p>
