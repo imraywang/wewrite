@@ -38,6 +38,16 @@ const COMPLETION_TEXT: Record<string, string> = {
   NEEDS_CONTEXT: "❓ 需要补充信息",
 };
 
+function fmtDur(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(s / 60);
+  return m > 0 ? `${m} 分 ${s % 60} 秒` : `${s} 秒`;
+}
+
+function rememberJob(id: string, kind: "generate" | "distribute") {
+  try { localStorage.setItem("wewrite:job", JSON.stringify({ id, kind })); } catch {}
+}
+
 export default function HomePage() {
   const [personas, setPersonas] = useState<CatalogItem[]>([]);
   const [themes, setThemes] = useState<CatalogItem[]>([]);
@@ -66,14 +76,40 @@ export default function HomePage() {
 
   const toast = useToast();
 
+  // Feature 1: Elapsed timer state
+  const [jobStartedAt, setJobStartedAt] = useState<number | null>(null);   // ms
+  const [jobEndedAt, setJobEndedAt] = useState<number | null>(null);       // ms
+  const [distStartedAt, setDistStartedAt] = useState<number | null>(null); // ms
+  const [distEndedAt, setDistEndedAt] = useState<number | null>(null);     // ms
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+
+  // Ticking effect — only runs while something is running
+  useEffect(() => {
+    if (!running && !distributing) return;
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [running, distributing]);
+
   useEffect(() => {
     getPersonas().then(setPersonas).catch(() => {});
     getThemes().then(setThemes).catch(() => {});
     getAccount().then(setAccount).catch(() => {});
+
+    // Feature 2: Resume job from localStorage on mount
+    let saved: string | null = null;
+    try { saved = localStorage.getItem("wewrite:job"); } catch {}
+    if (saved) {
+      try {
+        const { id, kind } = JSON.parse(saved);
+        if (id) resumeJob(id, String(kind));
+      } catch {}
+    }
+
     return () => {
       cancelRef.current?.();
       distCancelRef.current?.();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -148,6 +184,43 @@ export default function HomePage() {
     }
   }
 
+  // Feature 2: Resume a job from localStorage (placed after renderEvent/renderDistEvent/push/pushDist)
+  async function resumeJob(id: string, kind: string) {
+    let detail: JobDetail;
+    try { detail = await getJob(id); }
+    catch { try { localStorage.removeItem("wewrite:job"); } catch {} return; }
+    const live = detail.status === "running" || detail.status === "queued";
+    if (kind === "distribute") {
+      setDistStartedAt(detail.created_at * 1000);
+      if (live) {
+        setDistLines([]); setDistributing(true);
+        distCancelRef.current = streamJob(id, renderDistEvent, async () => {
+          try {
+            const d = await getJob(id); setDistResult(d);
+            if (d.completion) pushDist("step", COMPLETION_TEXT[d.completion] ?? d.completion);
+          } catch (err) { pushDist("err", String(err)); }
+          setDistEndedAt(Date.now()); setDistributing(false);
+        });
+      } else {
+        setDistResult(detail);
+      }
+    } else {
+      setJobStartedAt(detail.created_at * 1000);
+      if (live) {
+        setLines([]); setRunning(true);
+        cancelRef.current = streamJob(id, renderEvent, async () => {
+          try {
+            const d = await getJob(id); setResult(d);
+            if (d.completion) push("step", COMPLETION_TEXT[d.completion] ?? d.completion);
+          } catch (err) { push("err", String(err)); }
+          setJobEndedAt(Date.now()); setRunning(false);
+        });
+      } else {
+        setResult(detail);
+      }
+    }
+  }
+
   async function trackDistributeJob(jobId: string) {
     setDistLines([]);
     setDistResult(null);
@@ -166,6 +239,7 @@ export default function HomePage() {
           pushDist("err", String(err));
           toast.error(String(err));
         }
+        setDistEndedAt(Date.now());
         setDistributing(false);
       }
     );
@@ -178,6 +252,8 @@ export default function HomePage() {
         source_job_id: result.id,
         platforms: ["xiaohongshu", "douyin"],
       });
+      setDistStartedAt(job.created_at * 1000); setDistEndedAt(null);
+      rememberJob(job.id, "distribute");
       await trackDistributeJob(job.id);
     } catch (err) {
       pushDist("err", String(err));
@@ -193,6 +269,8 @@ export default function HomePage() {
         source_text: srcText,
         platforms: ["xiaohongshu", "douyin"],
       });
+      setDistStartedAt(job.created_at * 1000); setDistEndedAt(null);
+      rememberJob(job.id, "distribute");
       await trackDistributeJob(job.id);
     } catch (err) {
       pushDist("err", String(err));
@@ -205,6 +283,7 @@ export default function HomePage() {
     setLines([]);
     setResult(null);
     setRunning(true);
+    setJobStartedAt(null); setJobEndedAt(null);
     try {
       const job = await createJob({
         prompt,
@@ -213,6 +292,8 @@ export default function HomePage() {
         persona: persona || null,
         publish_draft: publishDraft,
       });
+      setJobStartedAt(job.created_at * 1000);
+      rememberJob(job.id, "generate");
       push("step", `任务已创建：${job.id}`);
       cancelRef.current = streamJob(
         job.id,
@@ -227,6 +308,7 @@ export default function HomePage() {
             push("err", String(err));
             toast.error(String(err));
           }
+          setJobEndedAt(Date.now());
           setRunning(false);
         }
       );
@@ -247,6 +329,10 @@ export default function HomePage() {
     tool: "text-muted",
     err: "text-red-400",
   };
+
+  // Feature 1: Elapsed time computations
+  const genElapsed = jobStartedAt == null ? null : running ? nowMs - jobStartedAt : jobEndedAt != null ? jobEndedAt - jobStartedAt : null;
+  const distElapsed = distStartedAt == null ? null : distributing ? nowMs - distStartedAt : distEndedAt != null ? distEndedAt - distStartedAt : null;
 
   return (
     <div className="space-y-6">
@@ -333,6 +419,11 @@ export default function HomePage() {
           <div className="mb-2 flex items-center gap-2">
             <h2 className="text-base font-semibold tracking-tight text-text">实时进度</h2>
             {running && <Badge tone="neutral">running</Badge>}
+            {genElapsed != null && (
+              <span className="ml-auto font-mono text-xs text-muted">
+                {running ? "已用时 " : "用时 "}{fmtDur(genElapsed)}
+              </span>
+            )}
           </div>
           <div
             ref={logRef}
@@ -461,6 +552,11 @@ export default function HomePage() {
           <div className="mb-2 flex items-center gap-2">
             <h2 className="text-base font-semibold tracking-tight text-text">分发进度</h2>
             {distributing && <Badge tone="neutral">running</Badge>}
+            {distElapsed != null && (
+              <span className="ml-auto font-mono text-xs text-muted">
+                {distributing ? "已用时 " : "用时 "}{fmtDur(distElapsed)}
+              </span>
+            )}
           </div>
           <div
             ref={distLogRef}
