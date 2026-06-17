@@ -1,6 +1,9 @@
 """WeWrite Web 后端入口。"""
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -57,3 +60,11 @@ def health() -> dict:
         "image_pool_configured": bool(s.image_config()),
         "skill_dir": str(s.skill_dir),
     }
+
+
+# 前端静态产物（next export 的 out/）。最后挂在 "/"：上面的 /api、/artifacts 已先注册、优先匹配；
+# 单进程单源服务前端 + API + 产物，省一个常驻进程，外层只需把 wewrite.cc 反代到本服务。
+# 未设 WEWRITE_FRONTEND_DIR（如纯本地后端开发）时不挂载，行为不变。
+_frontend_dir = os.environ.get("WEWRITE_FRONTEND_DIR", "")
+if _frontend_dir and Path(_frontend_dir).is_dir():
+    app.mount("/", StaticFiles(directory=_frontend_dir, html=True), name="frontend")

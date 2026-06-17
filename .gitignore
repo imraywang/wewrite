@@ -54,3 +54,7 @@ CLAUDE.md
 # IDE
 .vscode/
 .idea/
+
+# Next.js build/export artifacts
+web/frontend/.next/
+web/frontend/out/
