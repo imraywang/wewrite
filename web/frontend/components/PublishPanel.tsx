@@ -10,6 +10,7 @@ import {
   publishTo,
   startLogin,
 } from "@/lib/api";
+import { Badge, Button, Card, Dialog, Tooltip, useToast } from "@/components/ui";
 
 // 任务成稿后的「发布到各平台」面板。
 export default function PublishPanel({ jobId }: { jobId: string }) {
@@ -18,6 +19,7 @@ export default function PublishPanel({ jobId }: { jobId: string }) {
   const [busy, setBusy] = useState<string>("");
   const [msg, setMsg] = useState<Record<string, string>>({});
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const toast = useToast();
 
   async function refresh() {
     try {
@@ -60,6 +62,7 @@ export default function PublishPanel({ jobId }: { jobId: string }) {
       }, 2500);
     } catch (e) {
       setPlatMsg(platform, "登录失败：" + String(e));
+      toast.error("登录失败：" + String(e));
     } finally {
       setBusy("");
     }
@@ -76,118 +79,111 @@ export default function PublishPanel({ jobId }: { jobId: string }) {
     setPlatMsg(platform, "");
     try {
       const r = await publishTo(platform, { job_id: jobId });
-      setPlatMsg(
-        platform,
-        r.ok ? `发布成功 ✓ ${r.url || ""}` : `发布失败：${r.detail}`
-      );
+      const text = r.ok ? `发布成功 ✓ ${r.url || ""}` : `发布失败：${r.detail}`;
+      setPlatMsg(platform, text);
+      if (r.ok) {
+        toast.notice(text);
+      } else {
+        toast.error(`发布失败：${r.detail}`);
+      }
     } catch (e) {
-      setPlatMsg(platform, "发布失败：" + String(e));
+      const text = "发布失败：" + String(e);
+      setPlatMsg(platform, text);
+      toast.error(text);
     } finally {
       setBusy("");
     }
   }
 
   return (
-    <div style={{ marginTop: 18, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-      <h2 style={{ marginBottom: 12 }}>发布到平台</h2>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div className="mt-4 border-t border-border pt-4">
+      <h2 className="mb-3 text-base font-semibold text-text">发布到平台</h2>
+      <div className="flex flex-col gap-2.5">
         {platforms.map((p) => (
-          <div
-            key={p.id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              flexWrap: "wrap",
-              background: "var(--panel-2)",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              padding: "10px 14px",
-            }}
-          >
-            <strong style={{ minWidth: 90 }}>{p.label}</strong>
+          <Card key={p.id} className="flex flex-wrap items-center gap-3 py-2.5 px-3.5">
+            <strong className="min-w-[90px] text-text">
+              {p.note ? (
+                <Tooltip content={p.note}>{p.label}</Tooltip>
+              ) : (
+                p.label
+              )}
+            </strong>
+
             {!p.available ? (
-              <span className="badge">未开放</span>
+              <Badge tone="neutral">未开放</Badge>
             ) : p.logged_in ? (
-              <span className="badge done">
+              <Badge tone="ok">
                 已登录{p.user_name ? "：" + p.user_name : ""}
-              </span>
+              </Badge>
             ) : (
-              <span className="badge">未登录</span>
+              <Badge tone="warn">未登录</Badge>
             )}
 
-            <span style={{ flex: 1, color: "var(--muted)", fontSize: 12 }}>
-              {msg[p.id] || p.note}
+            <span className="flex-1 text-xs text-muted">
+              {msg[p.id] || ""}
             </span>
 
             {p.available && p.login_kind === "qrcode" && !p.logged_in && (
-              <button
-                className="btn secondary"
+              <Button
+                variant="secondary"
+                size="sm"
                 disabled={busy === p.id}
                 onClick={() => onLogin(p.id)}
               >
                 {busy === p.id ? "…" : "扫码登录"}
-              </button>
+              </Button>
             )}
             {p.available && p.logged_in && p.login_kind === "qrcode" && (
-              <button className="btn danger" onClick={() => onLogout(p.id)}>
+              <Button variant="ghost" size="sm" onClick={() => onLogout(p.id)}>
                 登出
-              </button>
+              </Button>
             )}
             {p.available && p.id !== "wechat" && (
-              <button
-                className="btn"
+              <Button
+                variant="primary"
+                size="sm"
                 disabled={busy === p.id || !p.logged_in}
                 onClick={() => onPublish(p.id)}
               >
                 发布
-              </button>
+              </Button>
             )}
             {p.id === "wechat" && (
-              <span style={{ fontSize: 12, color: "var(--muted)" }}>
+              <span className="text-xs text-muted">
                 （创建任务时勾选「推送草稿箱」由管道发布）
               </span>
             )}
-          </div>
+          </Card>
         ))}
       </div>
 
-      {qr && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 50,
-          }}
-          onClick={() => setQr(null)}
-        >
-          <div
-            className="panel"
-            style={{ maxWidth: 320, textAlign: "center" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2>扫码登录 · {qr.platform}</h2>
+      {/* QR 登录弹窗 */}
+      <Dialog
+        open={qr !== null}
+        onOpenChange={(open) => {
+          if (!open) setQr(null);
+        }}
+        title={qr ? `扫码登录 · ${qr.platform}` : "扫码登录"}
+      >
+        {qr && (
+          <div className="flex flex-col items-center gap-3 text-center">
             {qr.ch.qrcode_image ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={qr.ch.qrcode_image}
                 alt="二维码"
-                style={{ width: 220, height: 220, background: "#fff", borderRadius: 8 }}
+                className="rounded-lg bg-white"
+                style={{ width: 220, height: 220 }}
               />
             ) : (
-              <p className="hint">未返回二维码：{qr.ch.detail}</p>
+              <p className="text-sm text-muted">未返回二维码：{qr.ch.detail}</p>
             )}
-            <p className="hint">{qr.ch.detail}</p>
-            <button className="btn secondary" onClick={() => setQr(null)}>
-              关闭
-            </button>
+            {qr.ch.detail && (
+              <p className="text-sm text-muted">{qr.ch.detail}</p>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </Dialog>
     </div>
   );
 }
