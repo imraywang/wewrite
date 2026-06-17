@@ -7,12 +7,14 @@ import {
   CatalogItem,
   JobDetail,
   JobEvent,
+  JobSummary,
   artifactUrl,
   createJob,
   getAccount,
   getJob,
   getPersonas,
   getThemes,
+  listJobs,
   startDistribute,
   streamJob,
 } from "@/lib/api";
@@ -42,6 +44,16 @@ function fmtDur(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
   const m = Math.floor(s / 60);
   return m > 0 ? `${m} 分 ${s % 60} 秒` : `${s} 秒`;
+}
+
+function fmtAgo(createdAtSec: number): string {
+  const diff = Math.max(0, Date.now() - createdAtSec * 1000);
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "刚刚";
+  if (m < 60) return `${m} 分钟前`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} 小时前`;
+  return `${Math.floor(h / 24)} 天前`;
 }
 
 function rememberJob(id: string, kind: "generate" | "distribute") {
@@ -76,6 +88,10 @@ export default function HomePage() {
 
   const toast = useToast();
 
+  // History state
+  const [jobs, setJobs] = useState<JobSummary[]>([]);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+
   // Feature 1: Elapsed timer state
   const [jobStartedAt, setJobStartedAt] = useState<number | null>(null);   // ms
   const [jobEndedAt, setJobEndedAt] = useState<number | null>(null);       // ms
@@ -94,6 +110,7 @@ export default function HomePage() {
     getPersonas().then(setPersonas).catch(() => {});
     getThemes().then(setThemes).catch(() => {});
     getAccount().then(setAccount).catch(() => {});
+    refreshJobs();
 
     // Feature 2: Resume job from localStorage on mount
     let saved: string | null = null;
@@ -101,7 +118,7 @@ export default function HomePage() {
     if (saved) {
       try {
         const { id, kind } = JSON.parse(saved);
-        if (id) resumeJob(id, String(kind));
+        if (id) { setActiveJobId(id); resumeJob(id, String(kind)); }
       } catch {}
     }
 
@@ -184,11 +201,27 @@ export default function HomePage() {
     }
   }
 
+  function refreshJobs() {
+    listJobs().then(setJobs).catch(() => {});
+  }
+
+  async function openJob(id: string, kind: string) {
+    cancelRef.current?.();
+    distCancelRef.current?.();
+    setLines([]); setDistLines([]);
+    setResult(null); setDistResult(null);
+    setRunning(false); setDistributing(false);
+    setActiveJobId(id);
+    rememberJob(id, kind as "generate" | "distribute");
+    await resumeJob(id, kind);
+  }
+
   // Feature 2: Resume a job from localStorage (placed after renderEvent/renderDistEvent/push/pushDist)
   async function resumeJob(id: string, kind: string) {
     let detail: JobDetail;
     try { detail = await getJob(id); }
     catch { try { localStorage.removeItem("wewrite:job"); } catch {} return; }
+    setActiveJobId(id);
     const live = detail.status === "running" || detail.status === "queued";
     if (kind === "distribute") {
       setDistStartedAt(detail.created_at * 1000);
@@ -199,7 +232,7 @@ export default function HomePage() {
             const d = await getJob(id); setDistResult(d);
             if (d.completion) pushDist("step", COMPLETION_TEXT[d.completion] ?? d.completion);
           } catch (err) { pushDist("err", String(err)); }
-          setDistEndedAt(Date.now()); setDistributing(false);
+          setDistEndedAt(Date.now()); setDistributing(false); refreshJobs();
         });
       } else {
         setDistResult(detail);
@@ -213,7 +246,7 @@ export default function HomePage() {
             const d = await getJob(id); setResult(d);
             if (d.completion) push("step", COMPLETION_TEXT[d.completion] ?? d.completion);
           } catch (err) { push("err", String(err)); }
-          setJobEndedAt(Date.now()); setRunning(false);
+          setJobEndedAt(Date.now()); setRunning(false); refreshJobs();
         });
       } else {
         setResult(detail);
@@ -241,6 +274,7 @@ export default function HomePage() {
         }
         setDistEndedAt(Date.now());
         setDistributing(false);
+        refreshJobs();
       }
     );
   }
@@ -254,6 +288,7 @@ export default function HomePage() {
       });
       setDistStartedAt(job.created_at * 1000); setDistEndedAt(null);
       rememberJob(job.id, "distribute");
+      setActiveJobId(job.id); refreshJobs();
       await trackDistributeJob(job.id);
     } catch (err) {
       pushDist("err", String(err));
@@ -271,6 +306,7 @@ export default function HomePage() {
       });
       setDistStartedAt(job.created_at * 1000); setDistEndedAt(null);
       rememberJob(job.id, "distribute");
+      setActiveJobId(job.id); refreshJobs();
       await trackDistributeJob(job.id);
     } catch (err) {
       pushDist("err", String(err));
@@ -294,6 +330,7 @@ export default function HomePage() {
       });
       setJobStartedAt(job.created_at * 1000);
       rememberJob(job.id, "generate");
+      setActiveJobId(job.id); refreshJobs();
       push("step", `任务已创建：${job.id}`);
       cancelRef.current = streamJob(
         job.id,
@@ -310,6 +347,7 @@ export default function HomePage() {
           }
           setJobEndedAt(Date.now());
           setRunning(false);
+          refreshJobs();
         }
       );
     } catch (err) {
@@ -619,6 +657,37 @@ export default function HomePage() {
             {distributing ? "分发中…" : "开始分发"}
           </Button>
         </div>
+      </Card>
+
+      {/* 历史任务 */}
+      <Card className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold tracking-tight text-text">历史任务</h2>
+          <Button variant="ghost" size="sm" className="ml-auto" onClick={refreshJobs}>刷新</Button>
+        </div>
+        {jobs.length === 0 ? (
+          <p className="text-sm text-muted">暂无任务记录（任务存于后端内存，后端重启后清空）。</p>
+        ) : (
+          <div className="max-h-72 space-y-1 overflow-y-auto">
+            {jobs.map((j) => (
+              <button
+                key={j.id}
+                onClick={() => openJob(j.id, j.kind ?? "generate")}
+                className={
+                  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors " +
+                  (activeJobId === j.id ? "bg-surface-2" : "hover:bg-surface-2")
+                }
+              >
+                <Badge tone="neutral">{j.kind === "distribute" ? "分发" : "生成"}</Badge>
+                <span className="flex-1 truncate text-text">{j.prompt || "(无标题)"}</span>
+                <Badge tone={j.status === "done" ? "ok" : j.status === "error" ? "danger" : "neutral"}>
+                  {j.status}
+                </Badge>
+                <span className="shrink-0 text-xs text-muted">{fmtAgo(j.created_at)}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );

@@ -111,6 +111,7 @@ export const createJob = (req: {
 }) => apiSend<JobSummary>("/api/jobs", "POST", req);
 
 export const getJob = (id: string) => apiGet<JobDetail>(`/api/jobs/${id}`);
+export const listJobs = () => apiGet<JobSummary[]>("/api/jobs");
 
 // ---- 多平台发布 ----
 export type PlatformStatus = {
