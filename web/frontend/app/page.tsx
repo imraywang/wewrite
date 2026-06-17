@@ -22,6 +22,7 @@ import {
   Button,
   Textarea,
   Checkbox,
+  Select,
   Tabs,
   Card,
   Badge,
@@ -269,34 +270,25 @@ export default function HomePage() {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <label className="text-sm text-muted">写作人格</label>
-            <select
+            <Select
               value={persona}
-              onChange={(e) => setPersona(e.target.value)}
-              className="h-10 w-full rounded-md border border-border bg-surface-2 px-3 text-sm text-text focus:outline-none focus:border-accent transition-colors"
-            >
-              <option value="">沿用我的默认（{account?.writing_persona ?? "…"}）</option>
-              {personas.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label} — {p.description}
-                </option>
-              ))}
-            </select>
+              onValueChange={setPersona}
+              options={[
+                { value: "", label: `沿用我的默认（${account?.writing_persona ?? "…"}）` },
+                ...personas.map((p) => ({ value: p.id, label: p.label, description: p.description })),
+              ]}
+            />
           </div>
           <div className="space-y-1">
             <label className="text-sm text-muted">排版主题</label>
-            <select
+            <Select
               value={theme}
-              onChange={(e) => setTheme(e.target.value)}
-              className="h-10 w-full rounded-md border border-border bg-surface-2 px-3 text-sm text-text focus:outline-none focus:border-accent transition-colors"
-            >
-              <option value="">沿用我的默认（{account?.theme ?? "…"}）</option>
-              {themes.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.id}
-                  {t.description ? `（${t.description}）` : ""}
-                </option>
-              ))}
-            </select>
+              onValueChange={setTheme}
+              options={[
+                { value: "", label: `沿用我的默认（${account?.theme ?? "…"}）` },
+                ...themes.map((t) => ({ value: t.id, label: t.id, description: t.description || undefined })),
+              ]}
+            />
           </div>
         </div>
 

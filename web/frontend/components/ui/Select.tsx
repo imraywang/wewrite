@@ -2,7 +2,7 @@
 import { Select as BaseSelect } from "@base-ui/react/select";
 import { cn } from "./cn";
 
-export type SelectOption = { value: string; label: string };
+export type SelectOption = { value: string; label: string; description?: string };
 
 export function Select({
   value,
@@ -43,12 +43,18 @@ export function Select({
                   key={opt.value}
                   value={opt.value}
                   className={cn(
-                    "cursor-default rounded px-3 py-1.5 text-sm text-text outline-none",
+                    "group cursor-default rounded px-3 py-1.5 outline-none",
                     "data-[highlighted]:bg-surface-2",
-                    "data-[selected]:text-accent data-[selected]:font-medium",
                   )}
                 >
-                  <BaseSelect.ItemText>{opt.label}</BaseSelect.ItemText>
+                  <BaseSelect.ItemText className="block text-sm text-text group-data-[selected]:font-medium group-data-[selected]:text-accent">
+                    {opt.label}
+                  </BaseSelect.ItemText>
+                  {opt.description ? (
+                    <span className="mt-0.5 block text-xs leading-snug text-muted">
+                      {opt.description}
+                    </span>
+                  ) : null}
                 </BaseSelect.Item>
               ))}
             </BaseSelect.List>

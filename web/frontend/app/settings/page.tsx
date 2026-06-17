@@ -11,7 +11,7 @@ import {
   saveStyle,
   unbindWeChat,
 } from "@/lib/api";
-import { Badge, Button, Card, Input } from "@/components/ui";
+import { Badge, Button, Card, Input, Select } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 
 export default function SettingsPage() {
@@ -121,32 +121,19 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium text-text">写作人格</label>
-            <select
+            <Select
               value={persona}
-              onChange={(e) => setPersona(e.target.value)}
-              className="h-10 w-full rounded-md border border-border bg-surface-2 px-3 text-sm text-text"
-            >
-              {personas.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label} — {p.description}
-                </option>
-              ))}
-            </select>
+              onValueChange={setPersona}
+              options={personas.map((p) => ({ value: p.id, label: p.label, description: p.description }))}
+            />
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium text-text">默认排版主题</label>
-            <select
+            <Select
               value={theme}
-              onChange={(e) => setTheme(e.target.value)}
-              className="h-10 w-full rounded-md border border-border bg-surface-2 px-3 text-sm text-text"
-            >
-              {themes.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.id}
-                  {t.description ? `（${t.description}）` : ""}
-                </option>
-              ))}
-            </select>
+              onValueChange={setTheme}
+              options={themes.map((t) => ({ value: t.id, label: t.id, description: t.description || undefined }))}
+            />
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium text-text">目标读者（可选）</label>
