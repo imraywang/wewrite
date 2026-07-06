@@ -8,7 +8,7 @@ wechat:
   author: ""  # 默认署名（可选）
 
 # AI 图片生成
-# 支持 9 个 provider，配一个就能用，配多个自动 fallback。
+# 支持 10 个 provider，配一个就能用，配多个自动 fallback。
 #
 # ┌─────────────────┬────────────────────────────────────────────────┬────────────────────┐
 # │ Provider        │ 获取 API Key                                   │ 特点               │
@@ -22,6 +22,7 @@ wechat:
 # │ gemini          │ https://aistudio.google.com/apikey             │ 免费额度较多       │
 # │ openrouter      │ https://openrouter.ai/settings/keys            │ 多模型代理         │
 # │ replicate       │ https://replicate.com/account/api-tokens       │ 开源模型丰富       │
+# │ agnes           │ https://agnes-ai.com                           │ 快速低成本         │
 # └─────────────────┴────────────────────────────────────────────────┴────────────────────┘
 #
 # 支持两种配置方式：
@@ -65,6 +66,8 @@ image:
 #     - provider: replicate
 #       api_key: "r8_..."
 #       # model: "google/nano-banana-pro"
-
+#     - provider: agnes
+#       api_key: "your_agnes_api_key"
+#       # model: "agnes-image-2.1-flash"
 # 默认排版主题
 theme: "professional-clean"

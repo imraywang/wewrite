@@ -12,6 +12,7 @@ Supports multiple providers via a simple abstraction:
   - azure_openai — Azure-hosted DALL-E
   - openrouter — multi-model proxy
   - jimeng (ByteDance) — good for Chinese prompts
+  - agnes (Agnes AI Image 2.0 Flash) — fast, low-cost, creative design
   - Custom providers via ImageProvider base class
 
 Usage as CLI:
@@ -74,21 +75,25 @@ SIZE_PRESETS = {
         "doubao": "2952x1256", "openai": _DEFAULT, "gemini": _DEFAULT,
         "dashscope": _DEFAULT, "minimax": _DEFAULT, "replicate": _DEFAULT,
         "azure_openai": _DEFAULT, "openrouter": _DEFAULT, "jimeng": _DEFAULT,
+        "agnes": "2392x1024",
     },
     "article": {
         "doubao": "2560x1440", "openai": _DEFAULT, "gemini": _DEFAULT,
         "dashscope": _DEFAULT, "minimax": _DEFAULT, "replicate": _DEFAULT,
         "azure_openai": _DEFAULT, "openrouter": _DEFAULT, "jimeng": _DEFAULT,
+        "agnes": _DEFAULT,
     },
     "vertical": {
         "doubao": "1088x2560", "openai": _DEFAULT_V, "gemini": _DEFAULT_V,
         "dashscope": _DEFAULT_V, "minimax": _DEFAULT_V, "replicate": _DEFAULT_V,
         "azure_openai": _DEFAULT_V, "openrouter": _DEFAULT_V, "jimeng": _DEFAULT_V,
+        "agnes": _DEFAULT_V,
     },
     "square": {
         "doubao": "2048x2048", "openai": _DEFAULT_SQ, "gemini": _DEFAULT_SQ,
         "dashscope": _DEFAULT_SQ, "minimax": _DEFAULT_SQ, "replicate": _DEFAULT_SQ,
         "azure_openai": _DEFAULT_SQ, "openrouter": _DEFAULT_SQ, "jimeng": _DEFAULT_SQ,
+        "agnes": _DEFAULT_SQ,
     },
 }
 
@@ -281,7 +286,7 @@ class DashScopeProvider(ImageProvider):
 
     provider_key = "dashscope"
 
-    def __init__(self, api_key: str, model: str = "qwen-image-2.0-pro",
+    def __init__(self, api_key: str, model: str = "qwen-image-2.0-pro-2026-04-22",
                  base_url: str = "https://dashscope.aliyuncs.com/api/v1", **_kw):
         self._api_key = api_key
         self._model = model
@@ -612,6 +617,79 @@ class JimengProvider(ImageProvider):
         raise ValueError("Jimeng polling timeout")
 
 
+# --- Agnes AI Provider ---
+
+class AgnesAIProvider(ImageProvider):
+    """Agnes AI Image 2.0 Flash — text-to-image, image-to-image, multi-image."""
+
+    provider_key = "agnes"
+
+    def __init__(self, api_key: str, model: str = "agnes-image-2.1-flash",
+                 base_url: str = "https://apihub.agnes-ai.com/v1", **_kw):
+        self._api_key = api_key
+        self._model = model
+        self._base_url = base_url.rstrip("/")
+
+    def _request(self, prompt: str, size: str,
+                 image: list[str] | None = None,
+                 return_b64: bool = False) -> dict:
+        """Send a generation request and return parsed JSON response."""
+        payload: dict = {
+            "model": self._model,
+            "prompt": prompt,
+            "size": size,
+        }
+        if image:
+            payload["extra_body"] = {
+                "image": image,
+                "response_format": "b64_json" if return_b64 else "url",
+            }
+        elif return_b64:
+            payload["return_base64"] = True
+        else:
+            payload["extra_body"] = {
+                "response_format": "url",
+            }
+
+        resp = requests.post(
+            f"{self._base_url}/images/generations",
+            headers={"Content-Type": "application/json",
+                     "Authorization": f"Bearer {self._api_key}"},
+            json=payload,
+            timeout=360,
+        )
+        data = resp.json()
+        if resp.status_code != 200:
+            raise ValueError(f"AgnesAI error ({resp.status_code}): "
+                             f"{data.get('error', {}).get('message', str(data))}")
+        return data
+
+    def generate(self, prompt: str, size: str) -> bytes:
+        """Generate an image (text-to-image) and return raw bytes."""
+        data = self._request(prompt, size)
+        item = data.get("data", [{}])[0]
+        url = item.get("url")
+        if url:
+            return _download_image(url)
+        b64 = item.get("b64_json")
+        if b64:
+            return base64.b64decode(b64)
+        raise ValueError(f"No image in AgnesAI response: {data}")
+
+    def generate_edit(self, prompt: str, size: str,
+                      image_urls: list[str]) -> bytes:
+        """Generate an edited image from input image(s) and return raw bytes."""
+        data = self._request(prompt, size, image=image_urls, return_b64=False)
+        item = data.get("data", [{}])[0]
+        url = item.get("url")
+        if url:
+            return _download_image(url)
+        b64 = item.get("b64_json")
+        if b64:
+            return base64.b64decode(b64)
+        raise ValueError(f"No image in AgnesAI response: {data}")
+
+
 # --- Provider registry ---
 
 PROVIDERS = {
@@ -624,6 +702,7 @@ PROVIDERS = {
     "azure_openai": AzureOpenAIProvider,
     "openrouter": OpenRouterProvider,
     "jimeng": JimengProvider,
+    "agnes": AgnesAIProvider,
 }
 
 
