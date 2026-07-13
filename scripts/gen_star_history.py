@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """生成自托管的 Star History 图表（docs/star-history.svg）。
 
-为什么自托管：api.star-history.com / starchart.cc 共享的 GitHub token 经常被
-限流（503/429），README 里的外链图时好时坏。本脚本用本仓库自己的 token 拉
-stargazer 时间线并渲染成静态 SVG 提交入库，由 GitHub 直接伺服，永不裂图。
+为什么自托管：GitHub 新的 API 限制下，star-history.com 等第三方图表服务需要
+用户自备 fine-grained PAT 才能拉数据（共享 token 池已 503/429），而 README
+嵌入的图片 URL 无法安全携带 token。本脚本改用本仓库 CI 的 GITHUB_TOKEN
+（Actions 每次运行临时签发、仅限本仓库）拉 stargazer 时间线，渲染成静态
+SVG 提交入库，由 GitHub 直接伺服，永不裂图。
 
 用法：
     GITHUB_TOKEN=$(gh auth token) python3 scripts/gen_star_history.py
