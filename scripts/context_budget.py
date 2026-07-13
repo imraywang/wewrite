@@ -49,7 +49,7 @@ PIPELINE_SKILLS = [
 ]
 
 # Step 4.2 always loads exactly one persona; midnight-friend is the default.
-DEFAULT_PERSONA = "personas/midnight-friend.yaml"
+DEFAULT_PERSONA = "skills/wewrite-write/personas/midnight-friend.yaml"
 
 LOAD_RE = re.compile(r"读取:\s*\{(?:skill_dir|root)\}/(references/[\w./-]+\.(?:md|yaml))")
 
@@ -75,19 +75,19 @@ def _stats(path: Path) -> tuple:
 
 def measure(skill_dir: Path) -> dict:
     entries = []
-    onpath_refs = []
+    seen_paths = []
     for rel in PIPELINE_SKILLS:
         skill_md = skill_dir / rel
         l, c = _stats(skill_md)
         entries.append({"name": rel, "lines": l, "chars": c})
+        # v3.0：references 归位在各 skill 目录内，相对 SKILL.md 所在目录解析
         for ref in parse_onpath_refs(skill_md.read_text(encoding="utf-8")):
-            if ref not in onpath_refs:
-                onpath_refs.append(ref)
-    for rel in onpath_refs:
-        p = skill_dir / rel
-        if p.exists():
+            p = (skill_md.parent / ref).resolve()
+            if p in seen_paths or not p.exists():
+                continue
+            seen_paths.append(p)
             l, c = _stats(p)
-            entries.append({"name": rel, "lines": l, "chars": c})
+            entries.append({"name": str(p.relative_to(skill_dir.resolve())), "lines": l, "chars": c})
     persona = skill_dir / DEFAULT_PERSONA
     if persona.exists():
         l, c = _stats(persona)

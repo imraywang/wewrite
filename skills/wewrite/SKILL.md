@@ -42,13 +42,13 @@ wewrite-* 模块）和**编排**（主管道 8 步按序跑完）。
 - **BLOCKED** — 关键步骤无法继续（如 wewrite CLI 缺失且用户拒绝安装）
 - **NEEDS_CONTEXT** — 需要用户提供信息才能继续（如首次设置需要公众号名称）
 
-**路径约定**：本文档中 `{root}` 指 WeWrite 仓库根目录 = `{skill_dir}/root`（本 skill 目录内指向仓库根的符号链接）。references/ 文档中的 `{skill_dir}` 一律指 `{root}`（历史约定）。
+**路径约定**：本文档中 `{skill_dir}` 指本 skill 目录（自带 `references/`）；兄弟模块经 `{skill_dir}/../wewrite-<模块>/` 访问（安装目录里各 skill 互为同级链接，路径经符号链接解析仍指回仓库）。**{repo}** = 仓库根，需要时用 `REPO="$(cd "$(dirname "$(realpath "{skill_dir}/SKILL.md")")/../.." && pwd)"` 定位。
 
 **读取/检查约定**：本文档中 `读取: <路径>` / `检查: <路径>` = **用你环境的文件读取工具真实打开该文件、读完其全部内容，然后再继续本步**。这不是描述性注释——未读取前不得执行依赖该文件的步骤；不同 harness 的文件读取工具名不同，按你环境的对应工具执行。
 
-**CLI 约定**：确定性操作（自检/抓热点/评分/生图/排版/发布…）一律走 `wewrite` 命令，需在 PATH（由 `install.sh` 安装）。**{home}** = 用户状态目录 `$WEWRITE_HOME` 或 `~/.wewrite`（`wewrite home` 可查）——config/style/history/playbook/output/exemplars 全在 {home}，不在仓库；references 文档中的状态路径同此约定。
+**CLI 约定**：确定性操作（自检/抓热点/评分/生图/排版/发布…）一律走 `wewrite` 命令，需在 PATH（缺失 → `bash {repo}/install.sh` 或 `uv tool install git+https://github.com/oaker-io/wewrite.git`）。**{home}** = 用户状态目录 `$WEWRITE_HOME` 或 `~/.wewrite`（`wewrite home` 可查）——config/style/history/playbook/output/exemplars 全在 {home}，不在仓库；references 文档中的状态路径同此约定。
 
-**管道状态**：跨模块状态统一落盘 `{home}/output/_state.yaml`，契约见 `{root}/references/pipeline-state.md`。主管道开新一篇文章时重置该文件（保留当天有效的 `flags`）。
+**管道状态**：跨模块状态统一落盘 `{home}/output/_state.yaml`，契约见 `{skill_dir}/references/pipeline-state.md`。主管道开新一篇文章时重置该文件（保留当天有效的 `flags`）。
 
 **Onboard 例外**：Onboard（wewrite-style）是交互式的（需要问用户问题），不受"全自动"约束。Onboard 完成后回到全自动管道。
 
@@ -68,11 +68,11 @@ wewrite-* 模块）和**编排**（主管道 8 步按序跑完）。
 | 学习我的修改 / 学排版 / 导入范文 / 查看范文库 | `wewrite-learn` | 自学习飞轮 |
 | 看看文章数据 / 效果复盘 | `wewrite-stats` | 拉数据 + 回填 + 建议 |
 | 改写成小红书 / 抖音版 / 多平台分发 | `wewrite-rewrite` | 一源多平台改写 |
-| 更新 / 更新 WeWrite / 升级 | （就地执行）在 `{root}` 执行 `git pull origin main`，完成后告知版本变化 | |
+| 更新 / 更新 WeWrite / 升级 | （就地执行）在 `{repo}` 执行 `git pull origin main` 并重跑 `bash {repo}/install.sh`（更新 CLI 与链接），完成后告知版本变化 | |
 
 <!-- wewrite:modular-start -->
 **模块激活方式**：环境有 Skill 工具 → 直接激活同名 skill；没有 →
-`读取: {root}/skills/<模块名>/SKILL.md`，跳过其「运行约定」小节，按主体执行。
+`读取: {skill_dir}/../<模块名>/SKILL.md`，跳过其「运行约定」小节，按主体执行。
 <!-- wewrite:modular-end -->
 
 ---
@@ -98,12 +98,12 @@ wewrite diagnose --json
 
 读返回 JSON 的 `flags` 与 `summary`（diagnose 已涵盖依赖检查 + config/env 双源识别，不必再单独 import 测试或读 config.yaml）：
 - `flags.skip_publish` / `flags.skip_image_gen` / `flags.use_writer_model` → 连同 `diagnosed_at: 今天` 写入 `{home}/output/_state.yaml` 的 `flags`，后续模块自动遵守。
-- `wewrite` 命令不存在或 `summary.failures > 0` → 引导 `bash {root}/install.sh`（安装/更新 wewrite CLI 并链接 skills）；否则静默继续。
+- `wewrite` 命令不存在或 `summary.failures > 0` → 引导 `bash {repo}/install.sh`（安装/更新 wewrite CLI 并链接 skills）；否则静默继续。
 - 若 `files.exemplars` 为空可顺带提示一次"可说**'导入范文'**建风格库"，不阻断。
 
 **1.2 版本检查**（仅本地交互式 skill 安装；云端/容器跳过）：
 
-`{root}` 是 git 仓库（存在 `.git`）且当前是交互式使用时，才比对本地 `VERSION` 与 `git show origin/main:VERSION`，不同则提示"说「更新」升级"（不阻断）。**容器/云端部署没有 `.git`、也不该让 agent 自更新（更新走重新部署）→ 直接跳过本步，不要跑 git 命令。**
+`{repo}` 是 git 仓库（存在 `.git`）且当前是交互式使用时，才比对本地 `VERSION` 与 `git show origin/main:VERSION`，不同则提示"说「更新」升级"（不阻断）。**容器/云端部署没有 `.git`、也不该让 agent 自更新（更新走重新部署）→ 直接跳过本步，不要跑 git 命令。**
 
 **1.3 加载风格**：
 
@@ -203,7 +203,7 @@ wewrite diagnose --json
 | 效果数据 | 告知等 24h |
 | Playbook 不存在 | 用 writing-guide.md |
 <!-- wewrite:modular-start -->
-| 模块 skill 未安装（Skill 工具不可见） | `读取: {root}/skills/<模块名>/SKILL.md` 按主体执行 |
+| 模块 skill 未安装（Skill 工具不可见） | `读取: {skill_dir}/../<模块名>/SKILL.md` 按主体执行 |
 <!-- wewrite:modular-end -->
 
 <!-- wewrite:inline-aux -->

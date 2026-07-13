@@ -128,6 +128,12 @@ git clone --depth 1 https://github.com/oaker-io/wewrite.git ~/wewrite
 cd ~/wewrite && bash install.sh
 ```
 
+也可以用 [skills.sh](https://skills.sh) 按需挑模块装（skill 目录复制即用；`wewrite` CLI 仍需按下方方式安装）：
+
+```bash
+npx skills add oaker-io/wewrite
+```
+
 `install.sh` 做三件事：装 `wewrite` CLI（uv/pipx，无则回退 venv）、把主入口和各
 `wewrite-*` 模块符号链接到 `~/.claude/skills/` 与 `~/.agents/skills/`、把旧版留在
 仓库里的用户状态迁到 `~/.wewrite/`。仓库可以克隆到任意位置。
@@ -194,19 +200,18 @@ cp config.example.yaml ~/.wewrite/config.yaml
 
 ```
 wewrite/
-├── skills/                   # 模块化 skill（v2.0：主入口 + 9 个模块，逐个链接到 ~/.claude/skills/）
+├── skills/                   # 模块化 skill（主入口 + 9 个模块，各自自带 references/，复制即用）
 │   ├── wewrite/                # 主入口：路由 + 全流程编排（Step 1/8 内联，Step 2-7 调模块）
-│   ├── wewrite-style/          # 风格设置 / Onboard
-│   ├── wewrite-topic/          # 选题（热点 + SEO + 10 个评分选题）
-│   ├── wewrite-write/          # 框架 + 素材 + 反 AI 写作
-│   ├── wewrite-review/         # SEO + 编辑自评 + 反 AI 评分 + 自检报告
-│   ├── wewrite-visual/         # 封面 + 内文配图
-│   ├── wewrite-publish/        # 排版 + 发布 + 主题画廊 + 小绿书
-│   ├── wewrite-learn/          # 学习修改 / 导入范文 / 学排版
-│   ├── wewrite-stats/          # 文章数据复盘
-│   └── wewrite-rewrite/        # 一源多平台改写（小红书 / 抖音）
+│   ├── wewrite-style/          # 风格设置 / Onboard（含 onboard.md、style-template.md、style.example.yaml）
+│   ├── wewrite-topic/          # 选题（topic-selection.md）
+│   ├── wewrite-write/          # 框架 + 素材 + 反 AI 写作（writing-guide、frameworks、personas/ 7 人格…）
+│   ├── wewrite-review/         # SEO + 编辑自评 + 反 AI 评分 + 自检报告（seo-rules.md）
+│   ├── wewrite-visual/         # 封面 + 内文配图（visual-prompts.md、cover-prompts.md）
+│   ├── wewrite-publish/        # 排版 + 发布 + 主题画廊 + 小绿书（wechat-constraints.md）
+│   ├── wewrite-learn/          # 学习修改 / 导入范文 / 学排版（learn-edits.md）
+│   ├── wewrite-stats/          # 文章数据复盘（effect-review.md）
+│   └── wewrite-rewrite/        # 一源多平台改写（multiplatform-rewrite.md + platforms/ 平台定义）
 ├── config.example.yaml       # API 配置模板
-├── style.example.yaml        # 风格配置模板
 ├── writing-config.example.yaml # 写作参数模板
 ├── pyproject.toml            # wewrite CLI 打包定义
 │
@@ -220,24 +225,6 @@ wewrite/
 │   └── toolkit/                # converter / theme / publisher / wechat_api / image_gen + 内置主题与平台定义
 │
 ├── scripts/                  # 仅开发构建工具（build_openclaw / build_codex / context_budget）
-│
-├── personas/                 # 7 套写作人格预设（含朱雀实测数据）
-│
-├── references/               # Agent 按需加载
-│   ├── writing-guide.md        # 写作规范 + 质量检查规则
-│   ├── frameworks.md           # 7 种写作框架（痛点/故事/清单/对比/热点解读/纯观点/复盘）
-│   ├── content-enhance.md     # 内容增强策略（角度发现/密度强化/细节锚定/真实体感）
-│   ├── topic-selection.md      # 选题评估规则
-│   ├── seo-rules.md            # 微信 SEO 规则
-│   ├── visual-prompts.md       # 视觉 AI 提示词规范
-│   ├── wechat-constraints.md   # 微信平台限制 + 自动修复
-│   ├── style-template.md       # 风格配置字段 + 16 主题列表
-│   ├── exemplar-seeds.yaml     # 通用人类写作模式种子（无范文库时的 fallback）
-│   ├── exemplars/              # 用户范文风格库（自动生成，不入 git）
-│   ├── onboard.md              # 首次设置流程
-│   ├── learn-edits.md          # 学习飞轮流程
-│   ├── effect-review.md        # 效果复盘流程
-│   └── pipeline-state.md       # 跨模块状态契约（output/_state.yaml）
 │
 └── tests/                    # converter + context_budget 测试
 ```

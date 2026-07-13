@@ -17,19 +17,19 @@ allowed-tools:
 <!-- wewrite:standalone-start -->
 ## 运行约定
 
-- **{root}** = `{skill_dir}/root`（本目录内指向 WeWrite 仓库根的符号链接）。
-- **CLI**：确定性操作走 `wewrite` 命令（需在 PATH；缺失则引导 `bash {root}/install.sh` 安装）。
+- **CLI**：确定性操作走 `wewrite` 命令（需在 PATH；缺失则引导 `uv tool install git+https://github.com/oaker-io/wewrite.git`，或在仓库里 `bash install.sh`）。
 - **{home}**：用户状态目录 = `$WEWRITE_HOME` 或 `~/.wewrite`（`wewrite home` 可查）。config/style/history/playbook/output/exemplars 全在 {home}，不在仓库；references 文档中的状态路径同此约定。
 - **`读取: <路径>`** = 用文件读取工具真实读完该文件再继续，不是注释。
-- **references/ 文档中的 `{skill_dir}`** 一律指 `{root}`（历史约定，指仓库根）。
-- **管道状态**：`{home}/output/_state.yaml`（契约见 `{root}/references/pipeline-state.md`）。
+- **references/**：本 skill 自带 `{skill_dir}/references/`；references 文档内的 `{skill_dir}` 即本 skill 目录。
+- **管道状态**：`{home}/output/_state.yaml`（契约见主入口 wewrite 的 `references/pipeline-state.md`）。
 
 ## 前置
 
 1. **文章**：用户指定的文件 > `_state.yaml` 的 `article` > `{home}/output/article.md`。
    都没有 → 问用户"要检查哪篇？"
-2. 本会话若未读过 `{root}/references/writing-guide.md` → 读取（5.2 校验按其编号规则
-   1.1-3.2 检查；管道模式下 wewrite-write 已读，保持驻留不要重读）。
+2. 本会话若未读过 writing-guide.md → `读取: {skill_dir}/../wewrite-write/references/writing-guide.md`
+   （5.2 校验按其编号规则 1.1-3.2 检查；管道模式下 wewrite-write 已读，保持驻留不要重读；
+   读不到该文件就按本文件内建检查项执行）。
 3. **模式判断**：管道内（或用户要"优化这篇"）→ 走「管道验证」；用户只要报告
    （"检查一下/怎么样"）→ 走「自检报告」，只诊断不改稿。
 <!-- wewrite:standalone-end -->
@@ -37,7 +37,7 @@ allowed-tools:
 ## 管道验证
 
 ```
-读取: {root}/references/seo-rules.md
+读取: {skill_dir}/references/seo-rules.md
 ```
 
 **5.1 SEO**：3 个备选标题 + 摘要（≤40 字）+ 5 标签 + 关键词密度优化

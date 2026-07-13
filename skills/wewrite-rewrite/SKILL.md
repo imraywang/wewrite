@@ -18,12 +18,11 @@ allowed-tools:
 <!-- wewrite:standalone-start -->
 ## 运行约定
 
-- **{root}** = `{skill_dir}/root`（本目录内指向 WeWrite 仓库根的符号链接）。
-- **CLI**：确定性操作走 `wewrite` 命令（需在 PATH；缺失则引导 `bash {root}/install.sh` 安装）。
+- **CLI**：确定性操作走 `wewrite` 命令（需在 PATH；缺失则引导 `uv tool install git+https://github.com/oaker-io/wewrite.git`，或在仓库里 `bash install.sh`）。
 - **{home}**：用户状态目录 = `$WEWRITE_HOME` 或 `~/.wewrite`（`wewrite home` 可查）。config/style/history/playbook/output/exemplars 全在 {home}，不在仓库；references 文档中的状态路径同此约定。
 - **`读取: <路径>`** = 用文件读取工具真实读完该文件再继续，不是注释。
-- **references/ 文档中的 `{skill_dir}`** 一律指 `{root}`（历史约定，指仓库根）。
-- **管道状态**：`{home}/output/_state.yaml`（契约见 `{root}/references/pipeline-state.md`）。
+- **references/**：本 skill 自带 `{skill_dir}/references/`；references 文档内的 `{skill_dir}` 即本 skill 目录。
+- **管道状态**：`{home}/output/_state.yaml`（契约见主入口 wewrite 的 `references/pipeline-state.md`）。
 <!-- wewrite:standalone-end -->
 
 ## 前置
@@ -31,18 +30,18 @@ allowed-tools:
 1. **源文章**：按优先级解析——用户指定的文件/粘贴内容 > `{home}/output/_state.yaml` 的
    `article` 字段 > `{home}/output/article.md`。都没有 → 问用户"要改写哪篇？给我文件路径
    或直接粘贴全文"。确定后把源复制/保存为 `{home}/output/source.md`（质量门要用）。
-2. **目标平台**：用户点名了就用；没点名 → 列出 `{root}/src/wewrite/toolkit/platforms/` 下的可用
+2. **目标平台**：用户点名了就用；没点名 → 列出 `{skill_dir}/platforms/` 下的可用
    平台（当前：xiaohongshu 小红书、douyin 抖音）问用户要哪几个，或"全部"。
 
 ## 执行
 
 ```
-读取: {root}/references/multiplatform-rewrite.md
+读取: {skill_dir}/references/multiplatform-rewrite.md
 ```
 
 对每个目标平台：
 
-1. `读取: {root}/src/wewrite/toolkit/platforms/<id>.yaml`，按其 `rewrite_brief`、字数区间、
+1. `读取: {skill_dir}/platforms/<id>.yaml`，按其 `rewrite_brief`、字数区间、
    标签数、输出格式改写。
 2. 遵守 multiplatform-rewrite.md 的原创铁律（内容级真改，重构信息顺序/开头/表达，
    不是洗稿）与人设一致要求（persona 内核不变，只适配表达方式）。

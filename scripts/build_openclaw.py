@@ -34,23 +34,27 @@ MODULAR_RE = re.compile(
 # The modular main entry resolves {root} via a per-skill symlink; the merged
 # monolith is one file at the repo root, so restore the classic convention.
 PATH_NOTE_MODULAR = (
-    "**路径约定**：本文档中 `{root}` 指 WeWrite 仓库根目录 = `{skill_dir}/root`"
-    "（本 skill 目录内指向仓库根的符号链接）。references/ 文档中的 `{skill_dir}` "
-    "一律指 `{root}`（历史约定）。"
+    "**路径约定**：本文档中 `{skill_dir}` 指本 skill 目录（自带 `references/`）；"
+    "兄弟模块经 `{skill_dir}/../wewrite-<模块>/` 访问（安装目录里各 skill 互为同级链接，"
+    "路径经符号链接解析仍指回仓库）。**{repo}** = 仓库根，需要时用 "
+    "`REPO=\"$(cd \"$(dirname \"$(realpath \"{skill_dir}/SKILL.md\")\")/../..\" && pwd)\"` 定位。"
 )
-PATH_NOTE_MERGED = "**路径约定**：本文档中 `{skill_dir}` 指本 SKILL.md 所在的目录（即 WeWrite 的根目录）。"
+PATH_NOTE_MERGED = (
+    "**路径约定**：本文档中 `{skill_dir}` 与 `{repo}` 均指本 SKILL.md 所在的目录"
+    "（即 WeWrite 单体版根目录，references/ 与 personas/ 在其下）。"
+)
 
-# Directories to copy alongside SKILL.md
-# （v2.2 起运行时代码在 pip 包 `wewrite` 里，dist 只需 prompt 层资产）
-COPY_DIRS = ["references", "personas"]
+# prompt 层资产自 v3.0 起归位在各 skill 目录内；合并单体时收拢到 dist 的
+# references/（各模块文件名不重复）、personas/、platforms/ 平铺目录。
+COLLECT_DIR_NAMES = ["references", "personas", "platforms"]
 
-# Files to copy alongside SKILL.md
+# Files to copy alongside SKILL.md（(源路径, dist 内文件名)）
 COPY_FILES = [
-    "config.example.yaml",
-    "style.example.yaml",
-    "writing-config.example.yaml",
-    "VERSION",
-    "install.sh",  # 无 pyproject 时自动改为从 git 安装 wewrite CLI
+    ("config.example.yaml", "config.example.yaml"),
+    ("skills/wewrite-style/style.example.yaml", "style.example.yaml"),
+    ("writing-config.example.yaml", "writing-config.example.yaml"),
+    ("VERSION", "VERSION"),
+    ("install.sh", "install.sh"),  # 无 pyproject 时自动改为从 git 安装 wewrite CLI
 ]
 
 # Frontmatter keys to strip (OpenClaw ignores allowed-tools)
@@ -154,7 +158,8 @@ def merge_monolith() -> str:
            + "\n\n---\n\n".join(module_body(m) for m in AUX_MODULES))
     body = body.replace("<!-- wewrite:inline-pipeline -->", pipeline)
     body = body.replace("<!-- wewrite:inline-aux -->", "---\n\n" + aux)
-    body = body.replace("{root}", "{skill_dir}")
+    # 兄弟模块引用在单体里都平铺到同一目录
+    body = re.sub(r"\{skill_dir\}/\.\./wewrite(?:-[a-z]+)?/", "{skill_dir}/", body)
     return f"---\n{fm}\n---\n\n{body.lstrip()}"
 
 
@@ -170,24 +175,34 @@ def build(output_dir: Path):
     out_skill.write_text(f"---\n{fm}\n---{body}", encoding="utf-8")
     print(f"  SKILL.md → {out_skill}")
 
-    # Copy supporting directories
-    for d in COPY_DIRS:
-        src = REPO_ROOT / d
-        dst = output_dir / d
-        if src.is_dir():
-            if dst.exists():
-                shutil.rmtree(dst)
-            shutil.copytree(src, dst, ignore=shutil.ignore_patterns(
-                "__pycache__", "*.pyc", "*.pyo",
-            ))
-            print(f"  {d}/ → {dst}")
+    # Collect per-skill prompt assets into flat dist dirs
+    for name in COLLECT_DIR_NAMES:
+        dst = output_dir / name
+        if dst.exists():
+            shutil.rmtree(dst)
+        count = 0
+        for skill_dir in sorted(SKILLS_DIR.iterdir()):
+            src = skill_dir / name
+            if not src.is_dir():
+                continue
+            dst.mkdir(parents=True, exist_ok=True)
+            for item in sorted(src.iterdir()):
+                if item.name.startswith(".") or item.name == "__pycache__":
+                    continue
+                if item.is_file():
+                    if (dst / item.name).exists():
+                        raise SystemExit(f"build: {name}/{item.name} 在多个 skill 中重名，无法平铺")
+                    shutil.copy2(item, dst / item.name)
+                    count += 1
+        if count:
+            print(f"  {name}/ ← skills/*/{name} ({count} files)")
 
     # Copy supporting files
-    for f in COPY_FILES:
-        src = REPO_ROOT / f
+    for src_rel, dst_name in COPY_FILES:
+        src = REPO_ROOT / src_rel
         if src.is_file():
-            shutil.copy2(src, output_dir / f)
-            print(f"  {f} → {output_dir / f}")
+            shutil.copy2(src, output_dir / dst_name)
+            print(f"  {dst_name} → {output_dir / dst_name}")
 
     print(f"\nDone. OpenClaw skill at: {output_dir}")
 

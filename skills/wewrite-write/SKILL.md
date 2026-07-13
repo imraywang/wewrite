@@ -22,12 +22,11 @@ allowed-tools:
 <!-- wewrite:standalone-start -->
 ## 运行约定
 
-- **{root}** = `{skill_dir}/root`（本目录内指向 WeWrite 仓库根的符号链接）。
-- **CLI**：确定性操作走 `wewrite` 命令（需在 PATH；缺失则引导 `bash {root}/install.sh` 安装）。
+- **CLI**：确定性操作走 `wewrite` 命令（需在 PATH；缺失则引导 `uv tool install git+https://github.com/oaker-io/wewrite.git`，或在仓库里 `bash install.sh`）。
 - **{home}**：用户状态目录 = `$WEWRITE_HOME` 或 `~/.wewrite`（`wewrite home` 可查）。config/style/history/playbook/output/exemplars 全在 {home}，不在仓库；references 文档中的状态路径同此约定。
 - **`读取: <路径>`** = 用文件读取工具真实读完该文件再继续，不是注释。
-- **references/ 文档中的 `{skill_dir}`** 一律指 `{root}`（历史约定，指仓库根）。
-- **管道状态**：`{home}/output/_state.yaml`（契约见 `{root}/references/pipeline-state.md`）。
+- **references/**：本 skill 自带 `{skill_dir}/references/`；references 文档内的 `{skill_dir}` 即本 skill 目录。
+- **管道状态**：`{home}/output/_state.yaml`（契约见主入口 wewrite 的 `references/pipeline-state.md`）。
 
 ## 前置
 
@@ -44,7 +43,7 @@ allowed-tools:
 **3.1 框架选择**：
 
 ```
-读取: {root}/references/frameworks.md
+读取: {skill_dir}/references/frameworks.md
 ```
 
 7 套框架（痛点/故事/清单/对比/热点解读/纯观点/复盘），自动选推荐指数最高的
@@ -53,7 +52,7 @@ allowed-tools:
 **3.2 素材采集 + 内容增强**（合并执行，共用搜索结果）：
 
 ```
-读取: {root}/references/content-enhance.md
+读取: {skill_dir}/references/content-enhance.md
 ```
 
 根据 3.1 选定的框架类型，一次搜索同时完成素材采集和内容增强：
@@ -82,8 +81,8 @@ allowed-tools:
 > 下面 4.1-4.3 读取的文件两种模式都要（自写时是写作依据；委托时是 brief 备料）。
 
 ```
-读取: {root}/references/anti-ai-writing-system.md
-读取: {root}/references/writing-guide.md
+读取: {skill_dir}/references/anti-ai-writing-system.md
+读取: {skill_dir}/references/writing-guide.md
 读取: {home}/playbook.md（如果存在，按 confidence 分级执行）
 读取: {home}/history.yaml（最近 3 篇的 dimensions + closing_type 字段）
 读取: {home}/exemplars/index.yaml（如果存在）
@@ -106,10 +105,10 @@ allowed-tools:
 **4.2 加载写作人格**：
 
 ```
-读取: {root}/personas/{选定人格}.yaml
+读取: {skill_dir}/personas/{选定人格}.yaml
 ```
 
-人格的选定规则（参见 `{root}/references/persona-selection.md`）：
+人格的选定规则（参见 `{skill_dir}/references/persona-selection.md`）：
 
 - **style.yaml 有 `writing_persona`** → 直接加载该人格。用户已固定账号声音，尊重配置（persona-selection 的「用户明确指定」优先级最高）。
 - **没有 `writing_persona`**（或用户本轮明确要求换风格）→ 读取 `references/persona-selection.md`，按选定选题的特征匹配 top 2 人格；用 history.yaml 最近 3 篇的写作人格降权（保证风格多样化），向用户展示推荐理由让其二选一；匹配不明确时默认 midnight-friend。
@@ -150,7 +149,7 @@ Category 映射规则：
 
 如果匹配到的范文不足 3 篇，用 general category 补足。
 
-**Fallback（范文库为空时）**：读取 `{root}/references/exemplar-seeds.yaml`，从每个段落类型中随机选 1 个注入 prompt。种子段落只示范人类写作的结构模式（句长方差、情绪锐度、自我纠正、非总结式收尾），不携带特定风格。注入时使用：
+**Fallback（范文库为空时）**：读取 `{skill_dir}/references/exemplar-seeds.yaml`，从每个段落类型中随机选 1 个注入 prompt。种子段落只示范人类写作的结构模式（句长方差、情绪锐度、自我纠正、非总结式收尾），不携带特定风格。注入时使用：
 
 > 以下是人类写作的结构模式示例，注意模仿其句长节奏和情绪表达方式（不要模仿具体内容或风格）：
 >
@@ -180,7 +179,7 @@ Category 映射规则：
 - **写作人格**：按 4.2 加载的人格参数写作（数据呈现方式、个人声音浓度、不确定性表达等）
 - **收尾方式**：persona 的 `closing_tendency` 仅作为倾向参考。根据文章内容和情绪弧线自行判断最自然的收尾方式。如果 history.yaml 中最近 3 篇有 `closing_type` 字段，避免使用相同的收尾类型
 - **写作规范**：writing-guide.md 中的基础规则（禁用词、句长方差、词汇混用等）在初稿阶段生效
-- **分段实时自检**：读取 `{root}/references/realtime-check.md`，每写完约 500 字（或每个 H2）就地执行 5 项快速检查（句长交替 / 情绪锚定 / 词汇温度 / 素材锚定 / 句法变形），问题当场掐掉不累积到全文。按 500 字/H2 粒度查，不要写一句修一句；也不要为凑检查项刻意制造大量单句段落（会触发过度优化检测）
+- **分段实时自检**：读取 `{skill_dir}/references/realtime-check.md`，每写完约 500 字（或每个 H2）就地执行 5 项快速检查（句长交替 / 情绪锚定 / 词汇温度 / 素材锚定 / 句法变形），问题当场掐掉不累积到全文。按 500 字/H2 粒度查，不要写一句修一句；也不要为凑检查项刻意制造大量单句段落（会触发过度优化检测）
 - 2-3 个编辑锚点：`<!-- ✏️ 编辑建议：在这里加一句你自己的经历/看法 -->`
 - 可选容器语法：`:::dialogue`、`:::timeline`、`:::callout`、`:::quote`、`:::highlight`（琥珀高亮框）、`:::summary`（青色总结框）
 

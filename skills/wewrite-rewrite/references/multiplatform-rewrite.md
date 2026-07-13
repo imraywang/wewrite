@@ -1,6 +1,6 @@
 # 多平台改写规则
 
-把一份源内容改写成各平台适配版本时遵循。各平台的具体调性见 `src/wewrite/toolkit/platforms/<id>.yaml` 的 `rewrite_brief`。
+把一份源内容改写成各平台适配版本时遵循。各平台的具体调性见 `{skill_dir}/platforms/<id>.yaml` 的 `rewrite_brief`。
 
 ## 原创铁律（最重要）
 - **内容级真改，不是洗稿**：重构信息顺序、换开头、改表达方式、按平台节奏重组，而不是逐句替换近义词。
