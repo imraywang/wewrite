@@ -1,0 +1,17 @@
+{
+  "name": "wewrite",
+  "description": "微信公众号内容全流程 AI skill：选题 → 写作 → 反AI验证 → 配图 → 排版发布。主入口 wewrite + 9 个可单独激活的 wewrite-* 模块。",
+  "version": "2.1.0",
+  "skills": [
+    "./skills/wewrite",
+    "./skills/wewrite-style",
+    "./skills/wewrite-topic",
+    "./skills/wewrite-write",
+    "./skills/wewrite-review",
+    "./skills/wewrite-visual",
+    "./skills/wewrite-publish",
+    "./skills/wewrite-learn",
+    "./skills/wewrite-stats",
+    "./skills/wewrite-rewrite"
+  ]
+}

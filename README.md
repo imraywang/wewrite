@@ -131,11 +131,12 @@ cd ~/wewrite && bash install.sh
 `install.sh` 会把主入口 `wewrite` 和各 `wewrite-*` 模块逐个符号链接到
 `~/.claude/skills/`（v2.0 起为模块化架构，仓库可以克隆到任意位置）。
 
-**OpenClaw**：
+**OpenClaw**（单 SKILL.md 形态，用构建好的 `dist/openclaw/`；v2.1 起仓库根不再有 SKILL.md）：
 
 ```bash
-git clone --depth 1 https://github.com/oaker-io/wewrite.git ~/.openclaw/skills/wewrite
-cd ~/.openclaw/skills/wewrite && bash install.sh
+git clone --depth 1 https://github.com/oaker-io/wewrite.git ~/wewrite
+ln -sfn ~/wewrite/dist/openclaw ~/.openclaw/skills/wewrite
+bash ~/.openclaw/skills/wewrite/install.sh
 ```
 
 **Codex**（OpenAI Codex CLI）：

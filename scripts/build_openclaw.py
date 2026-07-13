@@ -7,13 +7,8 @@ OpenClaw is a single-SKILL.md harness, so this build merges the modules back
 into one monolithic SKILL.md (main entry with module bodies inlined at the
 `<!-- wewrite:inline-* -->` markers, per-module standalone boilerplate stripped).
 
-The build also regenerates the repo-root SKILL.md as a committed artifact —
-the Claude-flavor monolith (no OpenClaw transforms). It exists for consumers
-that need a single file at the repo root: the web backend (pipeline.py reads
-it; workspaces symlink it) and legacy v1.x whole-repo skill installs.
-
 Usage:
-    python3 scripts/build_openclaw.py              # dist/openclaw/ + root SKILL.md
+    python3 scripts/build_openclaw.py              # output to dist/openclaw/
     python3 scripts/build_openclaw.py -o /tmp/oc   # custom output dir
 """
 
@@ -55,6 +50,7 @@ COPY_FILES = [
     "style.example.yaml",
     "writing-config.example.yaml",
     "VERSION",
+    "install.sh",  # creates .venv next to the copied SKILL.md (repo root has no SKILL.md since v2.1)
 ]
 
 # Frontmatter keys to strip (OpenClaw ignores allowed-tools)
@@ -162,26 +158,7 @@ def merge_monolith() -> str:
     return f"---\n{fm}\n---\n\n{body.lstrip()}"
 
 
-GENERATED_BANNER = (
-    "<!-- ⚠️ 生成文件：由 scripts/build_openclaw.py 从 skills/ 合并生成（merge_monolith）。"
-    "请改 skills/ 下的模块源文件，不要直接编辑本文件。 -->\n\n"
-)
-
-
-def write_root_monolith() -> Path:
-    """Regenerate the repo-root SKILL.md artifact (Claude flavor, banner added)."""
-    text = merge_monolith()
-    fm, body = split_frontmatter(text)
-    out = REPO_ROOT / "SKILL.md"
-    out.write_text(f"---\n{fm}\n---\n\n{GENERATED_BANNER}{body.lstrip()}",
-                   encoding="utf-8")
-    return out
-
-
 def build(output_dir: Path):
-    root_skill = write_root_monolith()
-    print(f"  SKILL.md（根目录生成产物）→ {root_skill}")
-
     text = merge_monolith()
 
     fm, body = split_frontmatter(text)
