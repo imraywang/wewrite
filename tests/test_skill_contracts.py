@@ -18,6 +18,21 @@ def test_pipeline_uses_run_scoped_state_and_explicit_publish_permission():
     assert "output/article.md" not in main
 
 
+def test_visual_is_an_optional_post_completion_action():
+    main = _read("skills/wewrite/SKILL.md")
+    visual = _read("skills/wewrite-visual/SKILL.md")
+    publish = _read("skills/wewrite-publish/SKILL.md")
+    assert "--mode complete --visual-mode none" in main
+    assert "--mode publish --visual-mode none" in main
+    assert main.index("wewrite run finish") < main.index("## 可选后续动作")
+    assert "已完成的文章也可以直接配图" in visual
+    assert "artifacts.illustrated_article" in visual
+    assert "任何模式都不得覆盖原始正文" in visual
+    assert "artifacts.illustrated_article" in publish
+    assert "排版和发布不得自动调用 `wewrite-visual`" in publish
+    assert "wewrite run permission publish allow" in publish
+
+
 def test_writing_and_review_require_source_ledger_and_editorial_quality():
     write = _read("skills/wewrite-write/SKILL.md")
     review = _read("skills/wewrite-review/SKILL.md")

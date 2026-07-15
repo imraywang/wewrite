@@ -13,6 +13,7 @@ from ..runs import (
     load_run,
     mark_step,
     resume_run,
+    set_publish_permission,
     state_as_json,
     update_run,
 )
@@ -45,6 +46,11 @@ def main(argv=None):
 
     resume = sub.add_parser("resume", help="恢复未完成任务")
     resume.add_argument("run_id")
+
+    permission = sub.add_parser("permission", help="记录或撤回外部动作授权")
+    permission.add_argument("permission", choices=["publish"])
+    permission.add_argument("value", choices=["allow", "deny"])
+    permission.add_argument("--run-id")
 
     update = sub.add_parser("update", help="合并更新任务状态")
     update.add_argument("--run-id")
@@ -81,6 +87,8 @@ def main(argv=None):
             return
         elif args.action == "resume":
             state = resume_run(args.run_id)
+        elif args.action == "permission":
+            state = set_publish_permission(args.value == "allow", args.run_id)
         elif args.action == "update":
             state = update_run(args.patch, args.run_id)
         elif args.action == "step":

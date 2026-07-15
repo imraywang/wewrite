@@ -424,7 +424,7 @@ background: linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%);
 | 暗黑模式颜色反转错误 | 自动注入 `data-darkmode-color/bgcolor` 属性 |
 | `<style>` 标签被剥离 | 所有 CSS 以内联 `style` 属性注入 |
 
-这些修复在 `converter.py` 的 `convert()` 方法中自动执行，覆盖所有 16 个主题。
+这些修复在 `converter.py` 的 `convert()` 方法中自动执行，覆盖所有内置主题。
 
 ---
 

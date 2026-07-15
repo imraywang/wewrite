@@ -15,10 +15,19 @@ allowed-tools:
 
 ## 前置
 
-用户指定文章时使用该文件；否则 `wewrite run show`，读取文章、标题、摘要、封面、预览路径、
-发布权限和降级标记。主题取 style.yaml 的 `theme`，默认 `professional-clean`。
+用户指定文章时使用该文件；否则 `wewrite run show`。如果
+`artifacts.illustrated_article` 存在且非空就使用它，否则使用 `artifacts.article`；读取标题、
+摘要、封面、预览路径、发布权限和降级标记。已完成文章可以直接排版或发布，不要恢复写作
+任务。主题取 style.yaml 的 `theme`，默认 `professional-clean`。
 
-进入时：
+排版和发布不得自动调用 `wewrite-visual`。没有封面时照常生成本地预览；只有用户另行要求
+配图时才进入视觉模块。
+
+用户本轮明确要求“推到草稿箱/发布”时，有任务先运行
+`wewrite run permission publish allow`；用户撤回时运行 `wewrite run permission publish deny`。
+只排版、预览或“完整制作”都不能授予发布权限。
+
+有任务时进入：
 
 ```bash
 wewrite run step publish in_progress
@@ -33,7 +42,7 @@ wewrite run step publish in_progress
 
 ## 动作
 
-始终先生成本地预览，保存到任务的 `artifacts.preview`：
+始终先生成本地预览，有任务时保存到 `artifacts.preview`；任务外文章保存到原文件旁：
 
 ```bash
 wewrite preview {article} --theme {theme} --no-open -o {preview}
@@ -48,7 +57,7 @@ wewrite preview {article} --theme {theme} --no-open -o {preview}
 wewrite publish {article} --cover {cover} --theme {theme} --title "{title}" --digest "{digest}"
 ```
 
-发布失败时保留预览，不自动重试产生外部动作。更新 `publish.preview_html`；成功时再写
+发布失败时保留预览，不自动重试产生外部动作。有任务时更新 `publish.preview_html`；成功时再写
 `publish.media_id`，随后：
 
 ```bash
