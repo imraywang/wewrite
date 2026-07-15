@@ -5,6 +5,7 @@
 """
 
 import sys
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -37,3 +38,22 @@ def test_readme_matches_optional_visual_workflow_and_theme_catalog():
     assert f"全部 {len(themes)} 个主题" in readme
     for theme in themes:
         assert f"`{theme}`" in readme
+
+
+def test_content_quality_evals_match_current_workflow():
+    data = json.loads((ROOT / "docs/evals.json").read_text(encoding="utf-8"))
+    names = {item["name"] for item in data["evals"]}
+    assert {
+        "analysis-with-sources",
+        "practical-guide-actionability",
+        "no-personal-material-no-fabrication",
+        "user-provided-story",
+        "weak-draft-must-revise",
+    }.issubset(names)
+    serialized = json.dumps(data, ensure_ascii=False)
+    assert "review-report.json" in serialized
+    assert "publishable=true" in serialized
+    assert "破句" not in serialized
+    assert "随机维度" not in serialized
+    assert "7 层去 AI" not in serialized
+    assert "output/" not in serialized

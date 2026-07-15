@@ -21,9 +21,13 @@ VISUAL_MODES = {"none", "cover", "full", "prompts"}
 PROTECTED_FIELDS = {"run_id", "created", "status", "mode", "permissions"}
 PROTECTED_ARTIFACTS = {
     "article",
+    "brief",
+    "claims",
+    "draft",
     "illustrated_article",
     "image_prompts",
     "images_manifest",
+    "review_report",
     "sources",
     "preview",
 }
@@ -132,7 +136,7 @@ def create_run(
     directory.mkdir(parents=True, exist_ok=False)
     created = _now()
     state = {
-        "version": 3,
+        "version": 4,
         "run_id": run_id,
         "created": created,
         "updated": created,
@@ -152,9 +156,13 @@ def create_run(
         },
         "artifacts": {
             "article": str((directory / "article.md").relative_to(home())),
+            "brief": str((directory / "brief.yaml").relative_to(home())),
+            "claims": str((directory / "claims.yaml").relative_to(home())),
+            "draft": str((directory / "draft.md").relative_to(home())),
             "illustrated_article": str((directory / "article-illustrated.md").relative_to(home())),
             "image_prompts": str((directory / "image-prompts.md").relative_to(home())),
             "images_manifest": str((directory / "images.json").relative_to(home())),
+            "review_report": str((directory / "review-report.json").relative_to(home())),
             "sources": str((directory / "sources.yaml").relative_to(home())),
             "preview": str((directory / "preview.html").relative_to(home())),
         },
@@ -194,22 +202,26 @@ def _deep_merge(base: dict, patch: dict) -> dict:
 
 
 def _upgrade_state(state: dict) -> bool:
-    """Add v3 derived-output paths to older run state without changing source artifacts."""
+    """Add current artifact paths to older run state without changing source artifacts."""
     run_id = state["run_id"]
     directory = run_dir(run_id)
     artifacts = state.setdefault("artifacts", {})
     expected = {
+        "brief": str((directory / "brief.yaml").relative_to(home())),
+        "claims": str((directory / "claims.yaml").relative_to(home())),
+        "draft": str((directory / "draft.md").relative_to(home())),
         "illustrated_article": str((directory / "article-illustrated.md").relative_to(home())),
         "image_prompts": str((directory / "image-prompts.md").relative_to(home())),
         "images_manifest": str((directory / "images.json").relative_to(home())),
+        "review_report": str((directory / "review-report.json").relative_to(home())),
     }
     changed = False
     for key, value in expected.items():
         if not artifacts.get(key):
             artifacts[key] = value
             changed = True
-    if state.get("version", 1) < 3:
-        state["version"] = 3
+    if state.get("version", 1) < 4:
+        state["version"] = 4
         changed = True
     return changed
 
@@ -311,6 +323,9 @@ def _history_entry(state: dict) -> dict:
         "topic_source": topic.get("source"),
         "topic_keywords": topic.get("keywords", []),
         "output_file": artifacts.get("article"),
+        "draft_file": artifacts.get("draft"),
+        "brief_file": artifacts.get("brief"),
+        "review_file": artifacts.get("review_report"),
         "sources_file": artifacts.get("sources"),
         "framework": state.get("framework"),
         "enhance_strategy": state.get("enhance_strategy"),
@@ -320,6 +335,7 @@ def _history_entry(state: dict) -> dict:
         "dimensions": state.get("dimensions", []),
         "closing_type": state.get("closing_type"),
         "quality_score": seo.get("quality_score"),
+        "editorial": state.get("editorial", {}),
         "provenance": state.get("provenance", {}),
         "status": state.get("status"),
         "stats": None,
@@ -344,6 +360,23 @@ def finish_run(patch: dict | None = None, run_id: str | None = None) -> dict:
     article_path = home() / article_rel if article_rel else None
     if not article_path or not article_path.is_file() or not article_path.read_text(encoding="utf-8").strip():
         raise ValueError("Cannot finish run before a non-empty article is saved")
+    draft_rel = (state.get("artifacts") or {}).get("draft")
+    draft_path = home() / draft_rel if draft_rel else None
+    if draft_path and draft_path.is_file() and draft_path.read_text(encoding="utf-8").strip():
+        editorial = state.get("editorial") or {}
+        report_rel = (state.get("artifacts") or {}).get("review_report")
+        report_path = home() / report_rel if report_rel else None
+        try:
+            report = json.loads(report_path.read_text(encoding="utf-8")) if report_path else {}
+        except (OSError, json.JSONDecodeError):
+            report = {}
+        if (
+            editorial.get("decision") != "pass"
+            or editorial.get("publishable") is not True
+            or report.get("decision") != "pass"
+            or report.get("publishable") is not True
+        ):
+            raise ValueError("Cannot finish a drafted article before editorial review passes")
     sources_file = run_dir(state["run_id"]) / "sources.yaml"
     if sources_file.exists():
         source_data = yaml.safe_load(sources_file.read_text(encoding="utf-8")) or {}

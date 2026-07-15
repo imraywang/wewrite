@@ -1,0 +1,64 @@
+{
+  "skill_name": "wewrite",
+  "quality_contract": "docs/content-quality-rubric.md",
+  "evals": [
+    {
+      "id": 0,
+      "name": "analysis-with-sources",
+      "prompt": "写一篇面向中小团队负责人的公众号文章：AI Agent 是否真的能替代传统 SaaS。默认完成正文，不配图、不发布。",
+      "expected_output": "先定义读者问题和有边界的核心判断，核对关键事实，初稿经过编辑判断与必要修改后生成成稿。",
+      "assertions": [
+        {"name": "brief_exists", "type": "file_exists", "description": "任务目录存在 brief.yaml，包含 audience、goal、thesis 和 personal_materials"},
+        {"name": "claims_exist", "type": "file_exists", "description": "任务目录存在 claims.yaml，事实主张关联 sources.yaml 的来源编号"},
+        {"name": "draft_exists", "type": "file_exists", "description": "任务目录存在 draft.md，且不被当作最终成稿"},
+        {"name": "article_exists", "type": "file_exists", "description": "编辑通过后生成 article.md"},
+        {"name": "review_passes", "type": "content_check", "description": "review-report.json 中 decision=pass 且 publishable=true"},
+        {"name": "claims_bounded", "type": "behavior_check", "description": "事实、推断与意见明确区分，核心结论没有超出来源支持范围"}
+      ]
+    },
+    {
+      "id": 1,
+      "name": "practical-guide-actionability",
+      "prompt": "写一篇给第一次用 AI 辅助写公众号的人的实操指南，重点是怎样避免生成一堆正确但没用的内容。",
+      "expected_output": "读者能按文章开始行动，并知道每一步的适用条件、风险和完成信号。",
+      "assertions": [
+        {"name": "reader_action", "type": "content_check", "description": "brief.yaml 明确读者行动，正文实际交付对应步骤或判断方法"},
+        {"name": "conditions_and_tradeoffs", "type": "content_check", "description": "建议包含必要条件、边界或失败信号，不堆泛泛建议"},
+        {"name": "no_unsupported_specifics", "type": "negative_check", "description": "工具、版本、价格、数字等具体信息没有来源时不写成事实"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "no-personal-material-no-fabrication",
+      "prompt": "用深夜好友风格写一篇：为什么我认为 AI 写作最缺的不是文采。没有更多个人故事，你直接完成。",
+      "expected_output": "可以使用第一人称判断，但不会编造作者的夜晚、朋友、同事、对话、动作或亲历场景。",
+      "assertions": [
+        {"name": "personal_materials_false", "type": "content_check", "description": "brief.yaml 中 personal_materials.available=false"},
+        {"name": "no_invented_experience", "type": "negative_check", "description": "正文没有用户未提供的个人事件、人物、对话、时间地点或感官细节"},
+        {"name": "safe_persona_fallback", "type": "behavior_check", "description": "人格退回观察、问题或核心判断开场，而非私人场景"}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "user-provided-story",
+      "prompt": "我上周给客户改文章时，客户把 1800 字删到 900 字，说问题不是短，而是每段都没有新信息。用这个真实经历写一篇公众号文章。",
+      "expected_output": "只使用用户给出的经历，不补造客户身份、地点、对话或结果，并把材料标为 user_provided。",
+      "assertions": [
+        {"name": "personal_material_recorded", "type": "content_check", "description": "brief.yaml 逐项记录用户提供的事实"},
+        {"name": "user_source_recorded", "type": "content_check", "description": "sources.yaml 中对应材料状态为 user_provided"},
+        {"name": "no_story_expansion", "type": "negative_check", "description": "没有为增强画面感补造人物身份、现场对话和感官细节"}
+      ]
+    },
+    {
+      "id": 4,
+      "name": "weak-draft-must-revise",
+      "prompt": "检查当前任务的初稿并完成成稿。初稿核心观点含糊、有一条无来源数据，而且没有给目标读者任何结论。",
+      "expected_output": "第一次编辑决定为 revise，实际删除或补证、重写核心判断与读者交付，再次检查通过后生成成稿。",
+      "assertions": [
+        {"name": "revision_happened", "type": "content_check", "description": "review-report.json 的 pass_number=2 且 edit_ratio 大于 0"},
+        {"name": "blockers_resolved", "type": "content_check", "description": "最终 blockers 为空，unsupported 主张不在成稿中"},
+        {"name": "final_publishable", "type": "content_check", "description": "最终 decision=pass 且 publishable=true"}
+      ]
+    }
+  ]
+}

@@ -17,6 +17,8 @@ single_sentence_paragraph_rate: 0.30   # 大量短句段落，像代码注释
 
 emotional_arc: "flat_pragmatic"
 opening_style: "problem_statement"    # 直接描述要解决的问题，不讲故事
+personal_material_policy: "only_current_user_supplied"
+fallback_opening_style: "verified_problem_statement"
 closing_tendency: "checklist"          # 倾向于用要点清单收束，但根据文章内容自行判断最合适的收尾方式
 
 data_intro_pattern: "problem → code → explain → caveat"

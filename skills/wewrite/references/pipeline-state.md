@@ -15,7 +15,7 @@
 ## 关键字段
 
 ```yaml
-version: 3
+version: 4
 run_id: "20260715-120000-a1b2c3"
 status: active                 # active / failed / completed
 mode: draft                    # draft / complete / publish
@@ -36,10 +36,14 @@ topic:
   keywords: []
   source: "用户指定"
 artifacts:
+  brief: "runs/<run_id>/brief.yaml"
+  claims: "runs/<run_id>/claims.yaml"
+  draft: "runs/<run_id>/draft.md"
   article: "runs/<run_id>/article.md"
   illustrated_article: "runs/<run_id>/article-illustrated.md"
   image_prompts: "runs/<run_id>/image-prompts.md"
   images_manifest: "runs/<run_id>/images.json"
+  review_report: "runs/<run_id>/review-report.json"
   sources: "runs/<run_id>/sources.yaml"
   preview: "runs/<run_id>/preview.html"
 seo:
@@ -48,6 +52,10 @@ seo:
   digest: ""
   tags: []
   quality_score: null
+editorial:
+  decision: null             # pass / revise / needs_input
+  pass_number: null
+  publishable: false
 provenance:
   verified_sources: 0
   unverified_sources: 0
@@ -64,6 +72,7 @@ last_error: null
 ```
 
 所有产物路径都相对 `{home}`。下游模块只读当前任务里的路径，不能回退到共享的
-`output/article.md`，避免并行文章互相覆盖。视觉模块只能写图片和
+`output/article.md`，避免并行文章互相覆盖。写作模块生成任务书、主张清单和初稿；审稿通过
+后才生成 `article.md` 和编辑报告。视觉模块只能写图片和
 `illustrated_article`，发布模块优先使用非空的带图副本，否则使用原始正文。读取 v2 任务时
-CLI 会自动补齐新增的派生产物路径，不需要手工迁移。
+CLI 会自动补齐新增产物路径，不需要手工迁移。
