@@ -16,6 +16,8 @@ single_sentence_paragraph_rate: 0.35   # 大量单句段落制造喜剧节奏
 
 emotional_arc: "buildup_to_absurd_twist"
 opening_style: "bait"                  # 用一个看似正经的开头引人上钩
+personal_material_policy: "only_current_user_supplied"
+fallback_opening_style: "observational_bait"
 closing_tendency: "callback"            # 倾向于回扣开头的梗形成闭环，但根据文章内容自行判断最合适的收尾方式
 
 data_intro_pattern: "setup → data as straight man → punchline"

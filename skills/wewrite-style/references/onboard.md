@@ -33,7 +33,7 @@
 - 专业/分析/深度/行业 → `industry-observer`
 - 犀利/锐评/观点/新闻 → `sharp-journalist`
 - 严谨/数据/研究/财经 → `cold-analyst`
-| 偏好哪种排版风格？（可运行 `gallery` 命令预览全部 16 个主题） | `theme` | "professional-clean" |
+| 偏好哪种排版风格？（可运行 `gallery` 命令预览全部 18 个主题） | `theme` | "professional-clean" |
 | 封面风格偏好？ | `cover_style` | 从 industry 推断 |
 | 有没有固定封面模板？ | `cover_template` | 不设置 |
 

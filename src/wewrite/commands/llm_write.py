@@ -20,7 +20,7 @@ brief 文件由编排 agent 写好：选题 / 框架 / **真实素材锚点** / 
     WEWRITE_WRITER_PROVIDER     deepseek|openai|…（默认 deepseek，仅作标识；走 OpenAI 兼容协议）
     WEWRITE_WRITER_BASE_URL     默认 https://api.deepseek.com
     WEWRITE_WRITER_MODEL        默认 deepseek-chat
-    WEWRITE_WRITER_TEMPERATURE  默认 1.0（求拟人，但别太高以免编造事实）
+    WEWRITE_WRITER_TEMPERATURE  默认 1.0（保留表达变化，但别太高以免编造事实）
     WEWRITE_WRITER_MAX_TOKENS   默认 4000
 """
 from __future__ import annotations

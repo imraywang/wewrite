@@ -56,3 +56,19 @@ def append_article(article: dict, path: Path | None = None) -> Path:
     data = load_history(path)
     data["articles"].append(article)
     return save_history(data, path)
+
+
+def upsert_article(article: dict, path: Path | None = None) -> Path:
+    """Insert an article or refresh the existing entry for the same run."""
+    data = load_history(path)
+    run_id = article.get("run_id")
+    if run_id:
+        for index, existing in enumerate(data["articles"]):
+            if existing.get("run_id") == run_id:
+                merged = {**existing, **article}
+                if article.get("stats") is None and existing.get("stats") is not None:
+                    merged["stats"] = existing["stats"]
+                data["articles"][index] = merged
+                return save_history(data, path)
+    data["articles"].append(article)
+    return save_history(data, path)

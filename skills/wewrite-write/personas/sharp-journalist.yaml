@@ -16,6 +16,8 @@ single_sentence_paragraph_rate: 0.20   # 多用短句成段制造节奏
 
 emotional_arc: "cold_open_to_sharp_close"
 opening_style: "cold_open"       # 直接切入核心矛盾，不铺垫
+personal_material_policy: "only_current_user_supplied"
+fallback_opening_style: "verified_conflict_or_thesis"
 closing_tendency: "sharp_statement" # 倾向于一句定性收束，但根据文章内容自行判断最合适的收尾方式
 
 data_intro_pattern: "claim → evidence → twist"

@@ -272,11 +272,16 @@ def compute_confidence(occurrences: int, first_seen: str, last_seen: str) -> flo
     - 1 occurrence = 3 (low, might be one-off)
     - 2 occurrences = 5 (moderate, likely a preference)
     - 3+ occurrences = 7+ (high, confirmed preference)
-    - Recency bonus: +1 if last_seen within 7 days
+    - Recency bonus: +0.5 for repeated patterns seen within 7 days
     - Age decay: -1 per 30 days since last_seen (user style evolves)
     - Clamped to 1-10
     """
-    base = min(8, 2 + occurrences * 2)
+    if occurrences <= 1:
+        base = 3.0
+    elif occurrences == 2:
+        base = 5.0
+    else:
+        base = min(8.0, 1.0 + occurrences * 2)
 
     try:
         last = datetime.fromisoformat(last_seen)
@@ -284,7 +289,7 @@ def compute_confidence(occurrences: int, first_seen: str, last_seen: str) -> flo
     except (ValueError, TypeError):
         days_since = 0
 
-    recency_bonus = 1.0 if days_since <= 7 else 0.0
+    recency_bonus = 0.5 if occurrences >= 2 and days_since <= 7 else 0.0
     age_decay = max(0, days_since // 30)
 
     return max(1.0, min(10.0, base + recency_bonus - age_decay))
@@ -292,7 +297,7 @@ def compute_confidence(occurrences: int, first_seen: str, last_seen: str) -> flo
 
 def aggregate_patterns(lessons: list[dict]) -> list[dict]:
     """Aggregate patterns across all lessons. Returns sorted by confidence."""
-    pattern_map = {}  # key → aggregated data
+    pattern_map = {}  # (key, scope, scope_value) → aggregated data
 
     for lesson in lessons:
         date = lesson.get("date", "")
@@ -301,18 +306,28 @@ def aggregate_patterns(lessons: list[dict]) -> list[dict]:
             key = p.get("key", "")
             if not key:
                 continue
-            if key not in pattern_map:
-                pattern_map[key] = {
+            scope = p.get("scope", "global")
+            scope_value = p.get("scope_value", "")
+            if scope not in {"global", "content_type", "framework", "persona"}:
+                scope = "global"
+                scope_value = ""
+            pattern_id = (key, scope, scope_value)
+            if pattern_id not in pattern_map:
+                pattern_map[pattern_id] = {
                     "key": key,
+                    "scope": scope,
+                    "scope_value": scope_value,
                     "type": p.get("type", "expression"),
                     "description": p.get("description", ""),
                     "rule": p.get("rule", ""),
                     "occurrences": 0,
                     "first_seen": timestamp,
                     "last_seen": timestamp,
+                    "confirmed": False,
                 }
-            entry = pattern_map[key]
+            entry = pattern_map[pattern_id]
             entry["occurrences"] += 1
+            entry["confirmed"] = entry["confirmed"] or bool(p.get("confirmed", False))
             # Keep the most recent description/rule (may evolve)
             if p.get("description"):
                 entry["description"] = p["description"]
@@ -330,6 +345,9 @@ def aggregate_patterns(lessons: list[dict]) -> list[dict]:
         entry["confidence"] = round(compute_confidence(
             entry["occurrences"], entry["first_seen"], entry["last_seen"]
         ), 1)
+        entry["hard"] = bool(entry["confirmed"] or (
+            entry["occurrences"] >= 2 and entry["confidence"] >= 5
+        ))
         results.append(entry)
 
     # Sort by confidence descending
@@ -341,7 +359,14 @@ def summarize_lessons(as_json: bool = False):
     """Load all lessons, aggregate patterns, output with confidence scores."""
     lessons = load_all_lessons()
     if not lessons:
-        print("No lessons found.")
+        if as_json:
+            print(json.dumps({
+                "total_lessons": 0,
+                "total_patterns": 0,
+                "patterns": [],
+            }, ensure_ascii=False, indent=2))
+        else:
+            print("No lessons found.")
         return
 
     patterns = aggregate_patterns(lessons)
@@ -365,7 +390,9 @@ def summarize_lessons(as_json: bool = False):
         print(f"         {p['description']}")
         if p["rule"]:
             print(f"         → {p['rule']}")
-        print(f"         seen {p['occurrences']}x, first {p['first_seen'][:10]}, last {p['last_seen'][:10]}")
+        print(f"         scope {p['scope']}:{p['scope_value'] or '*'}, "
+              f"seen {p['occurrences']}x, hard={str(p['hard']).lower()}, "
+              f"first {p['first_seen'][:10]}, last {p['last_seen'][:10]}")
         print()
 
 
@@ -442,7 +469,12 @@ def main():
     final_title = extract_title(final)
     try:
         from . import extract_exemplar
-        exemplar = extract_exemplar.extract_exemplar(final, source=final_title or "user-edited")
+        exemplar = extract_exemplar.extract_exemplar(
+            final,
+            source=final_title or "user-edited",
+            ownership="user",
+            authenticity="user_edited",
+        )
         if exemplar["quality_score"] >= 50:
             exemplar_path = extract_exemplar.save_exemplar(exemplar)
             print(f"\n✓ 终稿已加入范文库: {exemplar_path}")
@@ -479,13 +511,16 @@ Read the draft and final versions, then for each meaningful edit:
        key: "short_unique_id"     # e.g. "avoid_jiangzhen", "shorter_paragraphs"
        description: "把'讲真'替换为'坦白说'"
        rule: "不要使用'讲真'，用'坦白说'代替"  # imperative, executable
+       scope: "content_type"       # global / content_type / framework / persona
+       scope_value: "观点"         # global 时留空
+       confirmed: false             # 用户明确确认这是长期偏好时才设 true
 
 4. Rules must be imperative (可执行的指令), not descriptive.
    BAD:  "用户偏好简短段落"
    GOOD: "段落不超过 80 字，长段必须在 3 句内换行"
 
-5. If pattern already exists in previous lessons (same key),
-   confidence will auto-increase on next --summarize.
+5. If pattern already exists in previous lessons with the same key and scope,
+   confidence will auto-increase on next --summarize. A one-off edit stays soft.
 """)
 
 

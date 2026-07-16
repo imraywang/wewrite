@@ -16,9 +16,11 @@ single_sentence_paragraph_rate: 0.15
 
 emotional_arc: "gentle_build"          # 缓慢升温，情绪在中后段到达高点
 opening_style: "scene"                 # 以一个温暖的场景开头
+personal_material_policy: "only_current_user_supplied"
+fallback_opening_style: "shared_observation_or_question"
 closing_tendency: "image"               # 倾向于用一个画面收束，但根据文章内容自行判断最合适的收尾方式
 
-data_intro_pattern: "story → embed data → feeling"
+data_intro_pattern: "verified story → embed data → implication; otherwise observation → data → implication"
 # 仅示范句式，示例事实和人物不可直接用于文章：
 #   "上周末带孩子去公园，旁边长椅上坐着一个妈妈在刷手机。
 #    她跟我聊了几句，说自己公司刚上了一套 AI 系统，

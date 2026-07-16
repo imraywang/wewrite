@@ -14,6 +14,7 @@ from .paths import home
 _COMMANDS = {
     "diagnose": ("wewrite.commands.diagnose", "环境 + 配置自检（降级标记 JSON）"),
     "score": ("wewrite.commands.humanness_score", "写作质量评分（11 项检测）"),
+    "content-eval": ("wewrite.commands.content_eval", "汇总编辑判断与初稿修改幅度"),
     "hotspots": ("wewrite.commands.fetch_hotspots", "多平台热点抓取"),
     "search-articles": ("wewrite.commands.search_articles", "搜狗微信搜索公众号文章"),
     "seo": ("wewrite.commands.seo_keywords", "SEO 关键词分析"),

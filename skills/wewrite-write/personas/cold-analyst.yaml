@@ -16,6 +16,8 @@ single_sentence_paragraph_rate: 0.08   # 少用单句段落，保持专业感
 
 emotional_arc: "flat_with_insight"     # 整体平稳，在关键洞察处提升强度
 opening_style: "thesis"               # 开头直接亮核心论点
+personal_material_policy: "only_current_user_supplied"
+fallback_opening_style: "thesis"
 closing_tendency: "implications"       # 倾向于以"这意味着什么"收束，但根据文章内容自行判断最合适的收尾方式
 
 data_intro_pattern: "framework → data → implication → caveat"

@@ -45,6 +45,8 @@ docs/*
 !docs/screenshots/
 !docs/demo-article.md
 !docs/star-history.svg
+!docs/evals.json
+!docs/content-quality-rubric.md
 CLAUDE.md
 
 # IDE

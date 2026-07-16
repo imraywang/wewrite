@@ -171,7 +171,9 @@ def count_short_paragraphs(text):
 # Main Extraction
 # ============================================================
 
-def extract_exemplar(text, category=None, source=None):
+def extract_exemplar(
+    text, category=None, source=None, *, ownership="unknown", authenticity="unverified"
+):
     """Analyze article and return structured exemplar dict."""
     clean = re.sub(r'^#+\s+.*$', '', text, flags=re.MULTILINE).strip()
     paragraphs = hs._split_paragraphs(text)
@@ -200,6 +202,10 @@ def extract_exemplar(text, category=None, source=None):
         "title": title,
         "source": source or title,
         "category": category,
+        "ownership": ownership,
+        "authenticity": authenticity,
+        "allowed_uses": ["style", "structure"],
+        "personal_materials_reusable": False,
         "quality_score": score_result["quality_score"],
         "fingerprint": {
             "sentence_stddev": sentence_stddev,
@@ -241,6 +247,10 @@ def save_exemplar(exemplar):
         "source": exemplar["source"],
         "category": category,
         "quality_score": exemplar["quality_score"],
+        "ownership": exemplar.get("ownership", "unknown"),
+        "authenticity": exemplar.get("authenticity", "unverified"),
+        "allowed_uses": exemplar.get("allowed_uses", ["style", "structure"]),
+        "personal_materials_reusable": False,
         "sentence_stddev": fp["sentence_stddev"],
         "vocab_temperature": fp["vocab_temperature"],
         "negative_ratio": fp["negative_ratio"],
@@ -280,6 +290,8 @@ def _update_index(filename, exemplar):
         "source": exemplar["source"],
         "category": exemplar["category"],
         "quality_score": exemplar["quality_score"],
+        "ownership": exemplar.get("ownership", "unknown"),
+        "authenticity": exemplar.get("authenticity", "unverified"),
         "extracted_at": exemplar["extracted_at"],
     }
     index = [e for e in index if e.get("file") != filename]
@@ -336,6 +348,8 @@ def main():
     parser.add_argument("--category", "-c", choices=CATEGORIES,
                         help="Article category (auto-detected if omitted)")
     parser.add_argument("--source", "-s", help="Source name (e.g. account name)")
+    parser.add_argument("--user-authored", action="store_true",
+                        help="标记为用户本人创作；仍不得复用其中的个人经历")
     parser.add_argument("--list", "-l", action="store_true", help="List all exemplars")
     parser.add_argument("--json", action="store_true", help="JSON output")
     args = parser.parse_args()
@@ -356,7 +370,13 @@ def main():
 
         text = path.read_text(encoding="utf-8")
         source = args.source or path.stem  # fallback to filename without extension
-        exemplar = extract_exemplar(text, category=args.category, source=source)
+        exemplar = extract_exemplar(
+            text,
+            category=args.category,
+            source=source,
+            ownership="user" if args.user_authored else "third_party",
+            authenticity="user_authored" if args.user_authored else "published",
+        )
         filepath = save_exemplar(exemplar)
 
         if args.json:

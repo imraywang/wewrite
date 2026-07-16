@@ -3,9 +3,17 @@ import yaml
 import pytest
 from PIL import Image
 
-from wewrite.commands import diagnose, fetch_stats, humanness_score, learn_edits
-from wewrite.history import append_article, load_history, save_history
-from wewrite.runs import create_run, finish_run, load_run, mark_step, resume_run, update_run
+from wewrite.commands import content_eval, diagnose, fetch_stats, humanness_score, learn_edits
+from wewrite.history import append_article, load_history, save_history, upsert_article
+from wewrite.runs import (
+    create_run,
+    finish_run,
+    load_run,
+    mark_step,
+    resume_run,
+    set_publish_permission,
+    update_run,
+)
 from wewrite.sources import add_source, load_sources
 from wewrite.toolkit import image_gen, publisher
 
@@ -28,6 +36,19 @@ def test_append_article_preserves_existing_history(tmp_path):
     append_article({"title": "第一篇"}, path)
     append_article({"title": "第二篇"}, path)
     assert [a["title"] for a in load_history(path)["articles"]] == ["第一篇", "第二篇"]
+
+
+def test_upsert_article_refreshes_run_without_losing_stats(tmp_path):
+    path = tmp_path / "history.yaml"
+    upsert_article({"run_id": "r1", "title": "初稿", "stats": {"read_count": 10}}, path)
+    upsert_article({"run_id": "r1", "title": "已发布", "media_id": "m1", "stats": None}, path)
+    articles = load_history(path)["articles"]
+    assert articles == [{
+        "run_id": "r1",
+        "title": "已发布",
+        "media_id": "m1",
+        "stats": {"read_count": 10},
+    }]
 
 
 def test_stats_updates_legacy_history_list(tmp_path, monkeypatch):
@@ -98,6 +119,94 @@ def test_exemplar_uses_high_is_good_quality_score(tmp_path, monkeypatch):
     index = yaml.safe_load((tmp_path / "index.yaml").read_text(encoding="utf-8"))
     assert saved["quality_score"] == exemplar["quality_score"]
     assert index[0]["quality_score"] == exemplar["quality_score"]
+    assert saved["ownership"] == "unknown"
+    assert saved["allowed_uses"] == ["style", "structure"]
+    assert saved["personal_materials_reusable"] is False
+
+
+def test_content_eval_requires_editorial_quality_and_measures_rewrite():
+    draft = "# 标题\n\n## 旧结构\n\n一个含糊的判断。"
+    final = "# 更准确的标题\n\n## 清楚的结论\n\n这个判断说明了适用条件。"
+    report = content_eval.build_report(draft, final, {
+        "decision": "pass",
+        "pass_number": 2,
+        "dimensions": {
+            "accuracy": 4,
+            "viewpoint": 4,
+            "usefulness": 5,
+            "voice": 4,
+            "readability": 4,
+        },
+        "blockers": [],
+        "major_issues": [],
+    })
+    assert report["publishable"] is True
+    assert report["structure_changed"] is True
+    assert report["edit_ratio"] > 0
+
+
+def test_content_eval_blocks_false_pass_and_bad_scores():
+    assessment = {
+        "decision": "pass",
+        "dimensions": {name: 4 for name in content_eval.DIMENSIONS},
+        "blockers": ["存在虚构经历"],
+        "major_issues": [],
+    }
+    assert content_eval.build_report("初稿", "终稿", assessment)["publishable"] is False
+    assessment["blockers"] = []
+    assessment["dimensions"]["accuracy"] = 2
+    assert content_eval.build_report("初稿", "终稿", assessment)["publishable"] is False
+    with pytest.raises(ValueError, match="non-empty"):
+        content_eval.build_report("", "终稿", assessment)
+
+
+def test_edit_learning_keeps_one_off_soft_and_scopes_patterns():
+    now = learn_edits.datetime.now().isoformat()
+    lessons = [{
+        "timestamp": now,
+        "patterns": [{
+            "key": "shorter_paragraphs", "rule": "拆短", "scope": "framework",
+            "scope_value": "清单", "confirmed": False,
+        }],
+    }]
+    one = learn_edits.aggregate_patterns(lessons)[0]
+    assert one["confidence"] < 5
+    assert one["hard"] is False
+
+    lessons.append({
+        "timestamp": now,
+        "patterns": [{
+            "key": "shorter_paragraphs", "rule": "拆短", "scope": "framework",
+            "scope_value": "清单", "confirmed": False,
+        }, {
+            "key": "shorter_paragraphs", "rule": "保留长段", "scope": "framework",
+            "scope_value": "观点", "confirmed": False,
+        }],
+    })
+    patterns = learn_edits.aggregate_patterns(lessons)
+    by_scope = {p["scope_value"]: p for p in patterns}
+    assert by_scope["清单"]["hard"] is True
+    assert by_scope["观点"]["hard"] is False
+
+
+def test_edit_learning_confirmation_can_make_single_rule_hard():
+    now = learn_edits.datetime.now().isoformat()
+    result = learn_edits.aggregate_patterns([{
+        "timestamp": now,
+        "patterns": [{"key": "tone", "confirmed": True}],
+    }])[0]
+    assert result["confidence"] < 5
+    assert result["hard"] is True
+
+
+def test_empty_learning_summary_is_valid_json(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("WEWRITE_HOME", str(tmp_path))
+    learn_edits.summarize_lessons(as_json=True)
+    assert yaml.safe_load(capsys.readouterr().out) == {
+        "total_lessons": 0,
+        "total_patterns": 0,
+        "patterns": [],
+    }
 
 
 def test_runs_are_isolated_resumable_and_finish_once(tmp_path, monkeypatch):
@@ -120,8 +229,71 @@ def test_runs_are_isolated_resumable_and_finish_once(tmp_path, monkeypatch):
     assert len(load_history(tmp_path / "history.yaml")["articles"]) == 1
     with pytest.raises(ValueError, match="immutable"):
         resume_run(second["run_id"])
-    with pytest.raises(ValueError, match="immutable"):
+    with pytest.raises(ValueError, match="start a new run"):
         update_run({"word_count": 9}, second["run_id"])
+
+
+def test_images_and_publish_can_follow_a_completed_article(tmp_path, monkeypatch):
+    monkeypatch.setenv("WEWRITE_HOME", str(tmp_path))
+    run = create_run(topic="先写后配图", mode="complete")
+    assert run["visual"]["mode"] == "none"
+    assert run["artifacts"]["illustrated_article"].endswith("article-illustrated.md")
+    (tmp_path / run["artifacts"]["article"]).write_text("已经完成的正文", encoding="utf-8")
+    finish_run(run_id=run["run_id"])
+
+    # The completed task remains the current article for independent follow-up actions.
+    assert load_run()["run_id"] == run["run_id"]
+    mark_step("visual", "in_progress")
+    update_run({"visual": {"mode": "cover"}, "images": {"cover": "cover.png"}})
+    mark_step("visual", "completed")
+    mark_step("publish", "in_progress")
+    update_run({"publish": {"preview_html": "preview.html", "media_id": "m1"}})
+    mark_step("publish", "completed")
+
+    finished = load_run(run["run_id"])
+    assert finished["status"] == "completed"
+    assert finished["steps"]["visual"]["status"] == "completed"
+    assert finished["steps"]["publish"]["status"] == "completed"
+    assert finished["images"]["cover"] == "cover.png"
+    articles = load_history(tmp_path / "history.yaml")["articles"]
+    assert len(articles) == 1
+    assert articles[0]["media_id"] == "m1"
+
+    with pytest.raises(ValueError, match="visual or publish"):
+        mark_step("review", "in_progress", run["run_id"])
+    with pytest.raises(ValueError, match="start a new run"):
+        update_run({"seo": {"title": "改正文"}}, run["run_id"])
+
+
+def test_all_run_modes_default_to_no_images(tmp_path, monkeypatch):
+    monkeypatch.setenv("WEWRITE_HOME", str(tmp_path))
+    for mode in ("draft", "complete", "publish"):
+        run = create_run(mode=mode)
+        assert run["visual"]["mode"] == "none"
+
+
+def test_v2_run_is_upgraded_for_current_artifacts(tmp_path, monkeypatch):
+    monkeypatch.setenv("WEWRITE_HOME", str(tmp_path))
+    run = create_run(topic="旧任务")
+    state_path = tmp_path / "runs" / run["run_id"] / "state.yaml"
+    legacy = yaml.safe_load(state_path.read_text(encoding="utf-8"))
+    legacy["version"] = 2
+    for key in (
+        "brief", "claims", "draft", "review_report",
+        "illustrated_article", "image_prompts", "images_manifest",
+    ):
+        legacy["artifacts"].pop(key)
+    state_path.write_text(yaml.safe_dump(legacy, allow_unicode=True), encoding="utf-8")
+
+    upgraded = load_run(run["run_id"])
+    assert upgraded["version"] == 4
+    assert upgraded["artifacts"]["brief"].endswith("brief.yaml")
+    assert upgraded["artifacts"]["claims"].endswith("claims.yaml")
+    assert upgraded["artifacts"]["draft"].endswith("draft.md")
+    assert upgraded["artifacts"]["review_report"].endswith("review-report.json")
+    assert upgraded["artifacts"]["illustrated_article"].endswith("article-illustrated.md")
+    assert upgraded["artifacts"]["image_prompts"].endswith("image-prompts.md")
+    assert upgraded["artifacts"]["images_manifest"].endswith("images.json")
 
 
 def test_source_ledger_is_per_run_and_deduplicates(tmp_path, monkeypatch):
@@ -166,11 +338,36 @@ def test_publish_run_requires_explicit_mode(tmp_path, monkeypatch):
         update_run({"artifacts": {"article": "other.md"}}, draft["run_id"])
 
 
+def test_publish_permission_can_be_granted_after_article_completion(tmp_path, monkeypatch):
+    monkeypatch.setenv("WEWRITE_HOME", str(tmp_path))
+    run = create_run(mode="draft")
+    (tmp_path / run["artifacts"]["article"]).write_text("稍后再发布", encoding="utf-8")
+    finish_run(run_id=run["run_id"])
+    assert load_run(run["run_id"])["permissions"]["publish"] is False
+    assert set_publish_permission(True, run["run_id"])["permissions"]["publish"] is True
+    assert set_publish_permission(False, run["run_id"])["permissions"]["publish"] is False
+    assert len(load_history(tmp_path / "history.yaml")["articles"]) == 1
+
+
 def test_run_cannot_finish_without_article(tmp_path, monkeypatch):
     monkeypatch.setenv("WEWRITE_HOME", str(tmp_path))
     run = create_run(topic="空任务")
     with pytest.raises(ValueError, match="non-empty article"):
         finish_run(run_id=run["run_id"])
+
+
+def test_drafted_run_cannot_finish_before_editorial_pass(tmp_path, monkeypatch):
+    monkeypatch.setenv("WEWRITE_HOME", str(tmp_path))
+    run = create_run(topic="需要审稿")
+    (tmp_path / run["artifacts"]["draft"]).write_text("初稿", encoding="utf-8")
+    (tmp_path / run["artifacts"]["article"]).write_text("成稿", encoding="utf-8")
+    with pytest.raises(ValueError, match="editorial review passes"):
+        finish_run(run_id=run["run_id"])
+    (tmp_path / run["artifacts"]["review_report"]).write_text(
+        '{"decision":"pass","publishable":true}', encoding="utf-8"
+    )
+    finished = finish_run({"editorial": {"decision": "pass", "publishable": True}}, run["run_id"])
+    assert finished["status"] == "completed"
 
 
 def _png_bytes(color="red"):
