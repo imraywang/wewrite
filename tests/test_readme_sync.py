@@ -57,3 +57,32 @@ def test_content_quality_evals_match_current_workflow():
     assert "随机维度" not in serialized
     assert "7 层去 AI" not in serialized
     assert "output/" not in serialized
+
+
+def test_plugin_manifest_matches_release_and_skills():
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    plugin = json.loads((ROOT / ".claude-plugin/plugin.json").read_text(encoding="utf-8"))
+    assert plugin["version"] == version
+
+    skills = plugin["skills"]
+    assert len(skills) == 10
+    assert len(set(skills)) == 10
+    for relative_path in skills:
+        assert (ROOT / relative_path / "SKILL.md").is_file()
+
+
+def test_retired_v4_files_stay_removed():
+    retired = [
+        "writing-config.example.yaml",
+        "skills/wewrite-publish/references/compliance-seo.md",
+        "skills/wewrite-visual/references/cover-prompts.md",
+        "skills/wewrite-visual/references/visual-prompts.md",
+        "skills/wewrite-write/references/anti-ai-writing-system.md",
+        "skills/wewrite-write/references/exemplar-seeds.yaml",
+        "skills/wewrite-write/references/frameworks.md",
+        "skills/wewrite-write/references/persona-selection.md",
+        "skills/wewrite-write/references/realtime-check.md",
+        "skills/wewrite-write/references/writing-guide.md",
+        "tests/fixtures/content_eval_assessment.yaml",
+    ]
+    assert not [relative_path for relative_path in retired if (ROOT / relative_path).exists()]

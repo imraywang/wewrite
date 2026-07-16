@@ -42,10 +42,6 @@ def playbook_path() -> Path:
     return home() / "playbook.md"
 
 
-def writing_config_path() -> Path:
-    return home() / "writing-config.yaml"
-
-
 def output_dir() -> Path:
     return home() / "output"
 

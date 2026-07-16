@@ -8,7 +8,7 @@ playbook.md
 corpus/
 lessons/
 
-# Optimized writing parameters (user runs loop to generate their own)
+# Legacy local files (keep ignored for older installations)
 writing-config.yaml
 optimization-results.tsv
 
@@ -30,8 +30,6 @@ __pycache__/
 *.pyo
 *.egg-info/
 dist/*
-!dist/openclaw/
-!dist/codex/
 build/
 .venv/
 .venv

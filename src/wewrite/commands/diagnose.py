@@ -2,7 +2,7 @@
 """
 Diagnose which writing-quality (humanness) measures are active in this WeWrite installation.
 
-Checks: Python deps, config.yaml, style.yaml, enhancement files, dimension variance.
+Checks: Python deps, config.yaml, style.yaml, learning files, dimension variance.
 Outputs a human-readable report or structured JSON.
 
 Usage:
@@ -46,7 +46,6 @@ WEIGHTS = {
     "style_file": 3,
     "writing_persona": 3,
     "persona_file": 2,
-    "writing_config": 1,
     "playbook": 2,
     "history_articles": 1,
     "dimension_variance": 1,
@@ -58,7 +57,7 @@ WEIGHTS = {
     "config_permissions": 0,
 }
 
-MAX_ANTI_AI_SCORE = sum(v for v in WEIGHTS.values() if v > 0)  # 13
+MAX_ANTI_AI_SCORE = sum(v for v in WEIGHTS.values() if v > 0)  # 12
 
 
 def make_check(group, name, status, detail=None, impact=None):
@@ -193,17 +192,8 @@ def check_style():
 
 
 def check_enhancements():
-    """Group 4: Check writing-config, playbook, history."""
+    """Group 4: Check playbook and history."""
     checks = []
-
-    # writing-config.yaml
-    if paths.writing_config_path().exists():
-        checks.append(make_check("enhancement", "writing_config", "pass", "found"))
-    else:
-        checks.append(make_check(
-            "enhancement", "writing_config", "warn",
-            "not found → using defaults (say '优化参数' to tune)",
-        ))
 
     # playbook.md
     if paths.playbook_path().exists():
@@ -279,8 +269,6 @@ def compute_summary(checks):
             recs.append(f'Persona file missing — check personas/ directory')
         elif name == "playbook":
             recs.append('Edit a generated article, then say "学习我的修改" to build playbook.md')
-        elif name == "writing_config":
-            recs.append('Say "优化参数" to run the optimization loop')
         elif name == "history_articles":
             recs.append("Generate your first article to start building history")
         elif name == "dimension_variance":
@@ -314,7 +302,6 @@ def file_status_map(checks):
         "home": str(paths.home()),
         "config_yaml": paths.config_path().exists(),
         "style_yaml": paths.style_path().exists(),
-        "writing_config_yaml": paths.writing_config_path().exists(),
         "playbook_md": paths.playbook_path().exists(),
         "history_yaml": paths.history_path().exists(),
         "persona": persona_name,

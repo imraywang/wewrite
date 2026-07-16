@@ -32,8 +32,6 @@ AUXILIARY = {
     "multiplatform-rewrite.md",  # 多平台改写 (wewrite-rewrite)
     "style-template.md",   # only referenced inside onboard.md
     "pipeline-state.md",   # maintainer contract doc, not loaded at runtime
-    "compliance-seo.md",   # orphan / dev-reference
-    "cover-prompts.md",    # orphan / dev-reference
     "wechat-constraints.md",  # dev-reference (key limits inlined in wewrite-publish)
 }
 

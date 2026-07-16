@@ -364,12 +364,11 @@ wewrite/
 │
 ├── pyproject.toml            # CLI 打包定义
 ├── config.example.yaml       # API 配置模板
-├── writing-config.example.yaml # 写作参数模板
 ├── scripts/                  # 仅开发工具（context_budget 预算门 / gen_star_history 图表）
 └── tests/                    # 排版、任务流程、skill/README 契约与上下文预算测试
 ```
 
-State 层（全部在 `~/.wewrite/`，不在仓库）：`config.yaml`、`style.yaml`、`history.yaml`、`playbook.md`、`writing-config.yaml`、`current_run`、`runs/`、`exemplars/`、`corpus/`、`lessons/`、`output/`、`themes/`、`personas/`。
+State 层（全部在 `~/.wewrite/`，不在仓库）：`config.yaml`、`style.yaml`、`history.yaml`、`playbook.md`、`current_run`、`runs/`、`exemplars/`、`corpus/`、`lessons/`、`output/`、`themes/`、`personas/`。
 
 </details>
 

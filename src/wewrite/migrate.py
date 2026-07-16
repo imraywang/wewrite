@@ -17,7 +17,6 @@ _ENTRIES = [
     ("style.yaml", "style.yaml"),
     ("history.yaml", "history.yaml"),
     ("playbook.md", "playbook.md"),
-    ("writing-config.yaml", "writing-config.yaml"),
     ("references/exemplars", "exemplars"),
     ("corpus", "corpus"),
     ("lessons", "lessons"),
