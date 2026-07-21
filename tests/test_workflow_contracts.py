@@ -395,6 +395,67 @@ def test_provider_override_filters_multi_provider_config():
     assert len(cfg["image"]["providers"]) == 2
 
 
+def test_atlascloud_provider_uses_media_api_submit_poll_and_download(monkeypatch):
+    calls = []
+
+    class Response:
+        def __init__(self, status_code=200, payload=None, content=b""):
+            self.status_code = status_code
+            self._payload = payload or {}
+            self.content = content
+            self.text = yaml.safe_dump(self._payload)
+
+        def json(self):
+            return self._payload
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError(self.status_code)
+
+    def fake_post(url, **kwargs):
+        calls.append(("POST", url, kwargs.get("json")))
+        assert url == "https://api.atlascloud.ai/api/v1/model/generateImage"
+        assert kwargs["json"]["model"] == "openai/gpt-image-2/text-to-image"
+        assert kwargs["json"]["size"] == "2048x1152"
+        assert kwargs["json"]["enable_sync_mode"] is False
+        return Response(payload={"data": {"id": "pred_1"}})
+
+    def fake_get(url, **_kwargs):
+        calls.append(("GET", url, None))
+        if url.endswith("/model/result/pred_1"):
+            return Response(payload={
+                "data": {
+                    "status": "completed",
+                    "outputs": ["https://cdn.example/out.png"],
+                }
+            })
+        if url == "https://cdn.example/out.png":
+            return Response(content=_png_bytes("blue"))
+        raise AssertionError(url)
+
+    monkeypatch.setattr(image_gen.requests, "post", fake_post)
+    monkeypatch.setattr(image_gen.requests, "get", fake_get)
+
+    provider = image_gen.AtlasCloudProvider(api_key="apikey-test", poll_interval=0)
+    result = provider.generate("画一张封面", "2048x1152")
+
+    assert result.startswith(b"\x89PNG")
+    assert calls[0][0] == "POST"
+    assert calls[1:] == [
+        ("GET", "https://api.atlascloud.ai/api/v1/model/result/pred_1", None),
+        ("GET", "https://cdn.example/out.png", None),
+    ]
+
+
+def test_atlascloud_provider_can_read_standard_env_key(monkeypatch):
+    monkeypatch.setenv("ATLASCLOUD_API_KEY", "apikey-env")
+
+    provider = image_gen._build_provider_chain({"image": {"provider": "atlascloud"}})[0]
+
+    assert isinstance(provider, image_gen.AtlasCloudProvider)
+    assert provider._api_key == "apikey-env"
+
+
 def test_generated_image_is_valid_and_matches_extension(tmp_path, monkeypatch):
     class FakeProvider:
         provider_key = "fake"
