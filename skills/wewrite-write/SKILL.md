@@ -36,6 +36,7 @@ allowed-tools:
 读取: {skill_dir}/references/editorial-quality.md
 读取: {skill_dir}/references/frameworks-quick.md
 读取: {skill_dir}/references/content-enhance.md
+读取: {skill_dir}/references/quality-gates.md
 ```
 
 ### 3.1 先定义文章
