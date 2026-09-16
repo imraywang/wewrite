@@ -154,7 +154,7 @@ cp config.example.yaml ~/.wewrite/config.yaml
 | 看看文章数据 | `wewrite-stats` | 阅读数据回填 + 选题建议 |
 | 重新设置风格 | `wewrite-style` | style.yaml |
 
-> 💡 **素材入口默认是文本。** 以上模块写的都是已有文本。公众号文章实际需要的素材经常是网页上的热点文章/报告、电话采访录音、产品演示视频——这些进不了写作管线，得先变成文本。先用 [cue-omni-reader](https://github.com/sensedeal/cue-skills/tree/main/cue-omni-reader) 收成 Markdown——网页（含页内视频/附件）+ 已授权本地文档/音频/视频，一次可选多个本地文件——再把文本丢进来选材写作。安装一行：`npx skills add sensedeal/cue-skills --skill cue-omni-reader`（MIT；可能计费）。
+> 💡 **文本是素材入口，但** `wewrite-topic` **和** `wewrite-write` **依赖的选题/正文都从已有文本展开。** 已接入的网页文章源（`fetch_article.py` / `fetch_hotspots.py`）能把文字页抓成 Markdown；但电话采访录音 / 产品演示视频 / 扫描件报告 / 线下会议速记——这些没有文本层或者只有音频/视频的素材——现有的采集管线抓不到。先用 [cue-omni-reader](https://github.com/sensedeal/cue-skills/tree/main/cue-omni-reader) 收成 Markdown——网页（含页内视频/附件）+ 已授权本地文档/音频/视频，一次可选多个本地文件——再把文本丢进来选材写作。安装一行：`npx skills add sensedeal/cue-skills --skill cue-omni-reader`（MIT；可能计费）。
 
 ## 🏗 架构：三层解耦
 
