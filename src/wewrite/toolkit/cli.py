@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+import re
 import sys
 import webbrowser
 from pathlib import Path
@@ -57,6 +58,34 @@ def cmd_preview(args):
         print("Opened in browser.")
 
 
+def _despace_path(text: str) -> str:
+    """去掉中文与英文/数字之间被自动插入的空格（第 1 问 -> 第1问）。
+
+    [local fix 2026-09-28] 与 converter._fix_cjk_spacing 配套：历史版本会污染
+    图片路径，这里用于把路径修回来。
+    """
+    text = re.sub(r"(?<=[\u4e00-\u9fff])\s+(?=[0-9A-Za-z])", "", text)
+    text = re.sub(r"(?<=[0-9A-Za-z])\s+(?=[\u4e00-\u9fff])", "", text)
+    return text
+
+
+def _repair_image_path(img_path, md_dir):
+    """路径里带中文空格的图片，尝试修回真实文件；找不到返回 None。"""
+    for base in (img_path, md_dir / img_path.name, md_dir / str(img_path)):
+        fixed = Path(_despace_path(str(base)))
+        if str(fixed) != str(base) and fixed.exists():
+            return fixed
+    target = _despace_path(img_path.name).lower()
+    for d in (img_path.parent, md_dir):
+        try:
+            for f in d.iterdir():
+                if f.is_file() and _despace_path(f.name).lower() == target:
+                    return f
+        except OSError:
+            pass
+    return None
+
+
 def cmd_publish(args):
     """Convert, upload images, and create WeChat draft."""
     cfg = load_config()
@@ -90,6 +119,7 @@ def cmd_publish(args):
     # Resolve relative paths against the markdown file's directory
     md_dir = Path(args.input).resolve().parent
     html = result.html
+    missing_images = []
     for img_src in result.images:
         if img_src.startswith(("http://", "https://")):
             print(f"Skipping remote image: {img_src}")
@@ -106,8 +136,33 @@ def cmd_publish(args):
             wechat_url = upload_image(token, str(img_path))
             html = html.replace(img_src, wechat_url)
             print(f"  -> {wechat_url}")
-        else:
-            print(f"Warning: image not found: {img_src} (searched {md_dir})")
+            continue
+
+        # [local fix 2026-09-28] 先尝试修复被 CJK 空格化污染的路径
+        repaired = _repair_image_path(img_path, md_dir)
+        if repaired is not None:
+            print(f"Note: repaired image path: {img_src} -> {repaired.name}")
+            wechat_url = upload_image(token, str(repaired))
+            html = html.replace(img_src, wechat_url)
+            print(f"  -> {wechat_url}")
+            continue
+
+        missing_images.append(img_src)
+        print(f"Warning: image not found: {img_src} (searched {md_dir})")
+
+    # [local fix 2026-09-28] 缺图不再只是一行 Warning
+    if missing_images:
+        print("")
+        print("!" * 64)
+        print(f"[!] {len(missing_images)} image(s) NOT uploaded - the draft will be missing pictures:")
+        for _m in missing_images:
+            print(f"    - {_m}")
+        print("    tip: 图片文件名请用纯 ASCII（如 img-01-cover.png）；")
+        print("         中文/数字混排的文件名会被排版器加空格而失效。")
+        print("!" * 64)
+        if getattr(args, "strict_images", False):
+            print("--strict-images 已开启，终止发布。")
+            sys.exit(2)
 
     # Upload cover image if provided
     thumb_media_id = None
@@ -385,6 +440,8 @@ def main():
     p_publish.add_argument("--title", help="Override article title")
     p_publish.add_argument("--author", default=None, help="Article author")
     p_publish.add_argument("--digest", default=None, help="Override article digest (≤120 UTF-8 bytes)")
+    p_publish.add_argument("--strict-images", action="store_true",
+                           help="图片缺失时终止发布（默认只打印醒目警告）[local fix 2026-09-28]")
 
     # themes
     sub.add_parser("themes", help="List available themes")
