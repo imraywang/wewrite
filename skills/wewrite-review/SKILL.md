@@ -23,6 +23,7 @@ allowed-tools:
 ```text
 读取: {skill_dir}/../wewrite-write/references/article-brief.md
 读取: {skill_dir}/../wewrite-write/references/editorial-quality.md
+读取: {skill_dir}/../wewrite-write/references/quality-gates.md
 读取: {skill_dir}/references/seo-rules.md
 ```
 
