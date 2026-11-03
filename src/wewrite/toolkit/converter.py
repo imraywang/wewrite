@@ -247,36 +247,53 @@ class WeChatConverter:
     # -- CJK compatibility fixes --
 
     def _fix_cjk_spacing(self, text: str) -> str:
-        """Auto-insert thin space between CJK and Latin/digit characters.
+        """Auto-insert a space between CJK and Latin/digit characters.
 
         WeChat renders CJK-Latin without spacing, making mixed text hard to read.
-        This inserts a thin space (U+200A) at CJK↔Latin boundaries.
-        Runs on raw Markdown before parsing, skipping code blocks and links.
+        This inserts a space at CJK<->Latin boundaries.
+
+        [local fix 2026-09-28] 只处理可见正文：Markdown 链接/图片目标、行内代码、
+        裸 URL 和 HTML 属性值先被占位保护（逐行处理，围栏代码块整块跳过）。
+        旧实现会把图片路径 `05-第1问.png` 改成 `05-第 1 问.png`，导致发布阶段
+        静默找不到图。
         """
-        # CJK unicode ranges
         cjk = r'[\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef]'
         latin = r'[A-Za-z0-9]'
 
-        lines = text.split('\n')
-        result = []
+        out = []
         in_code_block = False
-
-        for line in lines:
-            if line.strip().startswith('```'):
+        for line in text.split("\n"):
+            if line.strip().startswith("```"):
                 in_code_block = not in_code_block
-                result.append(line)
+                out.append(line)
                 continue
             if in_code_block:
-                result.append(line)
+                out.append(line)
                 continue
 
-            # CJK followed by Latin
-            line = re.sub(f'({cjk})({latin})', r'\1 \2', line)
-            # Latin followed by CJK
-            line = re.sub(f'({latin})({cjk})', r'\1 \2', line)
-            result.append(line)
+            stash = []
 
-        return '\n'.join(result)
+            def _stash(m):
+                stash.append(m.group(0))
+                return "\x00%d\x00" % (len(stash) - 1)
+
+            line = re.sub(r"`[^`\n]*`", _stash, line)          # 行内代码
+            line = re.sub(r"\]\([^)\n]*\)", _stash, line)       # 链接/图片目标
+            line = re.sub(r"<https?://[^>\s]+>", _stash, line)  # 自动链接
+            line = re.sub(r"https?://[^\s)\]]+", _stash, line)  # 裸 URL
+            line = re.sub(r'(?<==)"[^"\n]*"', _stash, line)     # HTML 属性值
+
+            line = re.sub("(%s)(%s)" % (cjk, latin), r"\1 \2", line)
+            line = re.sub("(%s)(%s)" % (latin, cjk), r"\1 \2", line)
+
+            def _restore(m):
+                i = int(m.group(1))
+                return stash[i] if 0 <= i < len(stash) else m.group(0)
+
+            line = re.sub(r"\x00(\d+)\x00", _restore, line)
+            out.append(line)
+
+        return "\n".join(out)
 
     def _fix_cjk_bold_punctuation(self, html: str) -> str:
         """Move Chinese punctuation outside bold/strong tags.
@@ -708,24 +725,50 @@ class WeChatConverter:
     # -- Digest generation --
 
     def _generate_digest(self, html: str, max_bytes: int = 120) -> str:
-        """Generate a digest that fits within WeChat's byte limit (120 bytes UTF-8)."""
+        """Generate a digest that fits within WeChat's byte limit (120 bytes UTF-8).
+
+        [local fix 2026-09-28] 旧实现取全篇第一段文字，正文以图注开篇时摘要就变成
+        「图注：...」。改为挑第一个实质段落：跳过图注/图片说明、纯图片块、
+        标题和文末声明。
+        """
         soup = BeautifulSoup(html, "html.parser")
-        text = soup.get_text(separator=" ", strip=True)
-        text = re.sub(r"\s+", " ", text).strip()
+        for tag in soup.find_all(["script", "style"]):
+            tag.decompose()
 
-        # Truncate to fit within max_bytes (UTF-8)
+        blocks = []
+        for el in soup.find_all(["p", "li", "h2", "h3", "h4", "blockquote"]):
+            if el.find_parent(["p", "li", "blockquote"]) is not None:
+                continue
+            txt = re.sub(r"\s+", " ", el.get_text(" ", strip=True)).strip()
+            if txt and txt not in blocks:
+                blocks.append(txt)
+        if not blocks:
+            blocks = [re.sub(r"\s+", " ", soup.get_text(" ", strip=True)).strip()]
+
+        caption_prefixes = ("图注", "插图", "题图", "图片：", "图片:", "图片来源",
+                            "来源：", "数据来源", "本文数据核对", "封面图")
+        def _is_caption(t):
+            return t.startswith(caption_prefixes) or t.startswith("（图源")
+
+        def _is_noise(t):
+            return len(t) < 20 or _is_caption(t)
+
+        body = [b for b in blocks if not _is_noise(b)]
+        if not body:
+            body = [b for b in blocks if not _is_caption(b)] or blocks
+
+        text = body[0]
+        for extra in body[1:]:
+            if len(text.encode("utf-8")) >= max_bytes // 2:
+                break
+            text = (text + " " + extra).strip()
+
         ellipsis = "..."
-        ellipsis_bytes = len(ellipsis.encode("utf-8"))
-        target_bytes = max_bytes - ellipsis_bytes
-
-        encoded = text.encode("utf-8")
-        if len(encoded) <= max_bytes:
+        if len(text.encode("utf-8")) <= max_bytes:
             return text
-
-        # Truncate at valid UTF-8 boundary
-        truncated = encoded[:target_bytes].decode("utf-8", errors="ignore").rstrip()
+        target_bytes = max_bytes - len(ellipsis.encode("utf-8"))
+        truncated = text.encode("utf-8")[:target_bytes].decode("utf-8", errors="ignore").rstrip()
         return truncated + ellipsis
-
 
 def make_paste_safe(html: str) -> str:
     """粘贴路径加固：文本节点包 <span leaf="">，空装饰元素补 <br> 占位。
