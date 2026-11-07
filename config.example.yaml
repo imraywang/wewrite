@@ -8,7 +8,7 @@ wechat:
   author: ""  # 默认署名（可选）
 
 # AI 图片生成
-# 支持 10 个 provider，配一个就能用，配多个自动 fallback。
+# 支持 11 个 provider，配一个就能用，配多个自动 fallback。
 #
 # ┌─────────────────┬────────────────────────────────────────────────┬────────────────────┐
 # │ Provider        │ 获取 API Key                                   │ 特点               │
@@ -23,6 +23,7 @@ wechat:
 # │ openrouter      │ https://openrouter.ai/settings/keys            │ 多模型代理         │
 # │ replicate       │ https://replicate.com/account/api-tokens       │ 开源模型丰富       │
 # │ sub2api          │ 自建 Sub2API 服务                              │ OpenAI 兼容聚合层  │
+# │ atlascloud      │ https://www.atlascloud.ai/console/api-keys     │ 多模型 Media API   │
 # └─────────────────┴────────────────────────────────────────────────┴────────────────────┘
 #
 # 支持两种配置方式：
@@ -68,6 +69,9 @@ image:
 #     - provider: replicate
 #       api_key: "r8_..."
 #       # model: "google/nano-banana-pro"
+#     - provider: atlascloud
+#       api_key: "apikey-..."  # 也可用环境变量 ATLASCLOUD_API_KEY
+#       # model: "openai/gpt-image-2/text-to-image"
 
 # 默认排版主题
 theme: "professional-clean"
