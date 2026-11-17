@@ -607,3 +607,63 @@ class TestTypographyR2:
         md = ":::label pill\nA\n:::\n\n:::steps\n一\n二\n:::"
         html = self._conv().convert(md).html
         assert [i for i in validate_html(html) if i["level"] == "ERROR"] == []
+
+# ===================================================================
+# 10. 回归测试 [local fix 2026-09-28]：CJK 空格化污染图片路径 / 摘要取到图注
+#     两个缺陷在上游 4.2.1 均存在
+# ===================================================================
+
+class TestCJKSpacingPathProtection:
+    def test_image_path_kept_intact(self, converter):
+        md = "# T\n\n![\u6210\u54c1\u9875\u7b2c1\u95ee](assets/05-\u6210\u54c1\u9875-\u7b2c1\u95ee.png)\n\n\u6b63\u6587\u4e2d\u6587abc"
+        html = converter.convert(md).html
+        assert "assets/05-\u6210\u54c1\u9875-\u7b2c1\u95ee.png" in html
+        assert "assets/05-\u6210\u54c1\u9875-\u7b2c 1 \u95ee.png" not in html
+
+    def test_link_target_kept_intact(self, converter):
+        md = "# T\n\n[\u6587\u6863](https://example.com/a1b/\u7b2c1\u7ae0.md)\n\n\u6b63\u6587"
+        html = converter.convert(md).html
+        assert "example.com/a1b/\u7b2c1\u7ae0.md" in html
+
+    def test_inline_code_kept_intact(self, converter):
+        md = "# T\n\n\u8def\u5f84\u662f `assets/05-\u7b2c1\u95ee.png`\u3002\n\n\u4e2d\u6587abc"
+        html = converter.convert(md).html
+        assert "assets/05-\u7b2c1\u95ee.png" in html
+
+    def test_visible_text_still_spaced(self, converter):
+        md = "# T\n\n\u4e2d\u6587abc\u4e2d\u6587\uff0c\u5171100\u4e2a"
+        plain = BeautifulSoup(converter.convert(md).html, "html.parser").get_text()
+        assert "\u4e2d\u6587 abc" in plain
+        assert "\u5171 100" in plain
+
+
+class TestDigestSkipsCaptions:
+    def test_digest_skips_figure_caption(self, converter):
+        md = ("# T\n\n![]\u56fe(a.png)\n\n"
+              "**\u56fe\u6ce8\uff1a\u8fd9\u662f\u56fe\u6ce8\uff0c\u4e0d\u8be5\u8fdb\u6458\u8981\u3002**\n\n"
+              "\u8fd9\u662f\u6b63\u6587\u7b2c\u4e00\u6bb5\uff0c\u5e94\u8be5\u88ab\u9009\u4e3a\u6458\u8981\u5185\u5bb9\uff0c\u5b83\u8db3\u591f\u957f\u4ee5\u901a\u8fc7\u8fc7\u6ee4\u6761\u4ef6\u3002\n")
+        digest = converter.convert(md).digest
+        assert digest.startswith("\u8fd9\u662f\u6b63\u6587\u7b2c\u4e00\u6bb5")
+        assert "\u56fe\u6ce8" not in digest
+
+    def test_digest_within_limit_with_leading_caption(self, converter):
+        md = "# T\n\n**\u56fe\u6ce8\uff1a\u77ed\u56fe\u6ce8**\n\n" + "\u6b63\u6587\u5185\u5bb9\u3002" * 60
+        d = converter.convert(md).digest
+        assert len(d.encode("utf-8")) <= 120
+        assert "\u56fe\u6ce8" not in d
+
+
+class TestPublishImagePathRepair:
+    def test_despace_path(self):
+        from wewrite.toolkit.cli import _despace_path
+        assert _despace_path("05-\u6210\u54c1\u9875-\u7b2c 1 \u95ee.png") == "05-\u6210\u54c1\u9875-\u7b2c1\u95ee.png"
+        assert _despace_path("img 05 \u56fe.png") == "img 05\u56fe.png"
+        assert _despace_path("img-01-cover.png") == "img-01-cover.png"
+
+    def test_repair_image_path(self, tmp_path):
+        from wewrite.toolkit.cli import _repair_image_path
+        real = tmp_path / "05-\u6210\u54c1\u9875-\u7b2c1\u95ee.png"
+        real.write_bytes(b"x")
+        broken = tmp_path / "05-\u6210\u54c1\u9875-\u7b2c 1 \u95ee.png"
+        assert _repair_image_path(broken, tmp_path) == real
+        assert _repair_image_path(tmp_path / "nope.png", tmp_path) is None
