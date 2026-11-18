@@ -389,6 +389,10 @@ class DashScopeProvider(ImageProvider):
         return base64.b64decode(img)
 
 
+class _GenerationOutcomeUnknown(ValueError):
+    """A paid request may still complete after the connection is lost."""
+
+
 class MiniMaxProvider(ImageProvider):
     """MiniMax image generation."""
 
@@ -398,9 +402,12 @@ class MiniMaxProvider(ImageProvider):
                  base_url: str = "https://api.minimax.io/v1", **_kw):
         self._api_key = api_key
         self._model = model
-        self._base_url = base_url
+        self._base_url = base_url.rstrip("/")
 
     def generate(self, prompt: str, size: str) -> bytes:
+        if self._model in {"MiniMax-H3-Image", "MiniMax-H3-Image-Highspeed"}:
+            return self._generate_h3(prompt, size)
+
         w, h = 1024, 1024
         try:
             w, h = (int(x) for x in size.split("x", 1))
@@ -422,6 +429,36 @@ class MiniMaxProvider(ImageProvider):
         if not b64_list:
             raise ValueError(f"No image in MiniMax response: {data}")
         return base64.b64decode(b64_list[0])
+
+    def _generate_h3(self, prompt: str, size: str) -> bytes:
+        payload = {
+            "model": self._model, "prompt": prompt, "n": 1,
+            "response_format": "b64_json", "size": size,
+        }
+        try:
+            resp = requests.post(
+                f"{self._base_url}/images/generations",
+                headers={"Authorization": f"Bearer {self._api_key}"},
+                json=payload,
+                timeout=600,
+                allow_redirects=False,
+            )
+        except requests.exceptions.RequestException as exc:
+            raise _GenerationOutcomeUnknown(
+                "MiniMax H3 generation may still complete. "
+                "No further generation was attempted."
+            ) from exc
+
+        if resp.status_code != 200:
+            raise ValueError(f"MiniMax H3 generation failed (HTTP {resp.status_code})")
+        items = resp.json().get("data")
+        item = items[0] if isinstance(items, list) and items else None
+        if not isinstance(item, dict):
+            raise ValueError("MiniMax H3 did not return an image")
+        if item.get("b64_json"):
+            return base64.b64decode(item["b64_json"], validate=True)
+        error = item.get("error") or {}
+        raise ValueError(f"MiniMax H3: {error.get('message') or 'missing image data'}")
 
 
 class ReplicateProvider(ImageProvider):
@@ -869,6 +906,9 @@ def generate_image(
             try:
                 raw_bytes = provider.generate(prompt, resolved_size)
                 break  # success
+            except _GenerationOutcomeUnknown:
+                # A retry or fallback could generate and charge for another image.
+                raise
             except requests.exceptions.HTTPError as e:
                 if e.response is not None and e.response.status_code == 429 and attempt < max_retries:
                     wait = 2 ** (attempt + 1)  # 2s, 4s
