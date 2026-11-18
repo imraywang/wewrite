@@ -1,3 +1,4 @@
+import base64
 import io
 import yaml
 import pytest
@@ -424,3 +425,80 @@ def test_wechat_draft_requires_cover_and_uses_timeout(monkeypatch):
     monkeypatch.setattr(publisher.requests, "post", fake_post)
     publisher.create_draft("token", "title", "<p>x</p>", "digest", "cover")
     assert captured["timeout"] == 30
+
+
+@pytest.mark.parametrize(("model", "host", "size", "expected_size"), [
+    ("MiniMax-H3-Image", None, "article", "1792x1024"),
+    ("MiniMax-H3-Image-Highspeed", "https://api.minimax.cn/v1/", "2720x1536", "2720x1536"),
+])
+def test_minimax_h3_generates_image(tmp_path, monkeypatch, model, host, size, expected_size):
+    entry = {"provider": "minimax", "model": model, "api_key": "test"}
+    if host:
+        entry["base_url"] = host
+
+    class Response:
+        status_code = 200
+
+        def json(self):
+            return {"data": [{"b64_json": base64.b64encode(_png_bytes()).decode()}]}
+
+    def fake_post(url, **kwargs):
+        assert url == (host or "https://api.minimax.io/v1").rstrip("/") + "/images/generations"
+        assert kwargs["headers"]["Authorization"] == "Bearer test"
+        assert kwargs["timeout"] >= 600
+        assert kwargs["json"] == {"model": model, "prompt": "A river", "n": 1,
+                                  "response_format": "b64_json", "size": expected_size}
+        return Response()
+
+    monkeypatch.setattr(image_gen.requests, "post", fake_post)
+    output = tmp_path / "image.png"
+    image_gen.generate_image("A river", str(output), size, {"image": entry})
+    with Image.open(output) as image:
+        assert image.format == "PNG"
+
+
+def test_minimax_h3_timeout_does_not_resubmit_or_fall_back(tmp_path, monkeypatch):
+    calls = []
+
+    def timed_out(url, **kwargs):
+        calls.append(url)
+        raise image_gen.requests.exceptions.Timeout()
+
+    monkeypatch.setattr(image_gen.requests, "post", timed_out)
+    config = {"image": {"providers": [
+        {"provider": "minimax", "model": "MiniMax-H3-Image", "api_key": "test"},
+        {"provider": "minimax", "api_key": "test"},
+    ]}}
+    with pytest.raises(ValueError, match="may still complete"):
+        image_gen.generate_image("A river", str(tmp_path / "image.png"), config=config)
+    assert calls == ["https://api.minimax.io/v1/images/generations"]
+
+
+def test_minimax_h3_reports_item_error(monkeypatch):
+    class Response:
+        status_code = 200
+
+        def json(self):
+            return {"data": [{"error": {"code": "1027", "message": "output withheld"}}]}
+
+    monkeypatch.setattr(image_gen.requests, "post", lambda *args, **kwargs: Response())
+    provider = image_gen.MiniMaxProvider("test", "MiniMax-H3-Image")
+    with pytest.raises(ValueError, match="output withheld"):
+        provider.generate("A river", "auto")
+
+
+def test_minimax_default_keeps_legacy_endpoint_and_shape(monkeypatch):
+    class Response:
+        status_code = 200
+
+        def json(self):
+            return {"data": {"image_base64": ["cGl4ZWxz"]}}
+
+    def fake_post(url, **kwargs):
+        assert url == "https://api.minimax.io/v1/image_generation"
+        assert kwargs["json"] == {"model": "image-01", "prompt": "A river", "n": 1,
+                                  "width": 1024, "height": 1024, "response_format": "base64"}
+        return Response()
+
+    monkeypatch.setattr(image_gen.requests, "post", fake_post)
+    assert image_gen.MiniMaxProvider("test").generate("A river", "1024x1024") == b"pixels"
