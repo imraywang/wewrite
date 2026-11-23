@@ -27,6 +27,10 @@ wechat:
 #
 # 支持两种配置方式：
 
+# For MiniMax H3 set provider to "minimax" and model to "MiniMax-H3-Image"
+# or "MiniMax-H3-Image-Highspeed". Set base_url to "https://api.minimax.cn/v1"
+# for China, or use the default "https://api.minimax.io/v1" for global keys.
+#
 # 方式一：单 provider（简单用法，填一个就行）
 image:
   provider: "doubao"           # 见上表 Provider 列
