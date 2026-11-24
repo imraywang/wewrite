@@ -12,6 +12,7 @@ Supports multiple providers via a simple abstraction:
   - azure_openai — Azure-hosted DALL-E
   - openrouter — multi-model proxy
   - jimeng (ByteDance) — good for Chinese prompts
+  - atlascloud — Atlas Cloud Media API image generation
   - Custom providers via ImageProvider base class
 
 Usage as CLI:
@@ -30,6 +31,7 @@ import base64
 import hashlib
 import hmac
 import json
+import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -74,21 +76,25 @@ SIZE_PRESETS = {
         "doubao": "2952x1256", "openai": _DEFAULT, "gemini": _DEFAULT,
         "dashscope": _DEFAULT, "minimax": _DEFAULT, "replicate": _DEFAULT,
         "azure_openai": _DEFAULT, "openrouter": _DEFAULT, "jimeng": _DEFAULT,
+        "atlascloud": "2560x1088",
     },
     "article": {
         "doubao": "2560x1440", "openai": _DEFAULT, "gemini": _DEFAULT,
         "dashscope": _DEFAULT, "minimax": _DEFAULT, "replicate": _DEFAULT,
         "azure_openai": _DEFAULT, "openrouter": _DEFAULT, "jimeng": _DEFAULT,
+        "atlascloud": "2048x1152",
     },
     "vertical": {
         "doubao": "1088x2560", "openai": _DEFAULT_V, "gemini": _DEFAULT_V,
         "dashscope": _DEFAULT_V, "minimax": _DEFAULT_V, "replicate": _DEFAULT_V,
         "azure_openai": _DEFAULT_V, "openrouter": _DEFAULT_V, "jimeng": _DEFAULT_V,
+        "atlascloud": "1088x2560",
     },
     "square": {
         "doubao": "2048x2048", "openai": _DEFAULT_SQ, "gemini": _DEFAULT_SQ,
         "dashscope": _DEFAULT_SQ, "minimax": _DEFAULT_SQ, "replicate": _DEFAULT_SQ,
         "azure_openai": _DEFAULT_SQ, "openrouter": _DEFAULT_SQ, "jimeng": _DEFAULT_SQ,
+        "atlascloud": "2048x2048",
     },
 }
 
@@ -749,6 +755,122 @@ class Sub2APIProvider(ImageProvider):
         raise ValueError(f"Sub2API: task {task_id} timed out after {self._timeout:.0f}s")
 
 
+class AtlasCloudProvider(ImageProvider):
+    """Atlas Cloud Media API provider for OpenAI GPT Image models."""
+
+    provider_key = "atlascloud"
+    _SUCCESS_STATUSES = {"completed", "succeeded", "success"}
+    _FAILURE_STATUSES = {"failed", "error", "canceled", "cancelled"}
+
+    def __init__(self, api_key: str,
+                 model: str = "openai/gpt-image-2/text-to-image",
+                 base_url: str = "https://api.atlascloud.ai/api/v1",
+                 quality: str = "medium", output_format: str = "jpeg",
+                 poll_interval: float = 3.0, timeout: float = 180.0, **_kw):
+        self._api_key = api_key
+        self._model = model
+        self._base_url = base_url.rstrip("/")
+        self._quality = quality
+        self._output_format = output_format
+        self._poll_interval = poll_interval
+        self._timeout = timeout
+
+    @staticmethod
+    def _find_output(value):
+        if isinstance(value, str):
+            if value.startswith(("http://", "https://", "data:image/")):
+                return value
+            try:
+                base64.b64decode(value, validate=True)
+            except Exception:
+                return None
+            return value
+        if isinstance(value, list):
+            for item in value:
+                found = AtlasCloudProvider._find_output(item)
+                if found:
+                    return found
+        if isinstance(value, dict):
+            for key in (
+                "url", "image", "image_url", "download_url", "b64_json",
+                "base64", "data", "outputs", "output", "result",
+            ):
+                if key in value:
+                    found = AtlasCloudProvider._find_output(value[key])
+                    if found:
+                        return found
+        return None
+
+    @staticmethod
+    def _decode_or_download(output: str) -> bytes:
+        if output.startswith(("http://", "https://")):
+            return _download_image(output)
+        if output.startswith("data:image/"):
+            _, b64 = output.split(",", 1)
+            return base64.b64decode(b64)
+        return base64.b64decode(output)
+
+    def _headers(self) -> dict:
+        return {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self._api_key}",
+        }
+
+    def _poll(self, task_id: str) -> dict:
+        result_url = f"{self._base_url}/model/result/{task_id}"
+        prediction_url = f"{self._base_url}/model/prediction/{task_id}"
+        deadline = time.time() + self._timeout
+        while time.time() < deadline:
+            time.sleep(self._poll_interval)
+            poll = requests.get(result_url, headers=self._headers(), timeout=30)
+            if poll.status_code == 404:
+                poll = requests.get(prediction_url, headers=self._headers(), timeout=30)
+            if poll.status_code != 200:
+                raise ValueError(f"Atlas Cloud poll error ({poll.status_code}): "
+                                 f"{_sanitize_for_log(poll.text)[:300]}")
+            data = poll.json() or {}
+            task = data.get("data") if isinstance(data.get("data"), dict) else data
+            status = str(task.get("status", "")).lower()
+            if status in self._SUCCESS_STATUSES:
+                return task
+            if status in self._FAILURE_STATUSES:
+                raise ValueError(f"Atlas Cloud task failed: {task.get('error') or task}")
+        raise ValueError(f"Atlas Cloud task {task_id} timed out after {self._timeout:.0f}s")
+
+    def generate(self, prompt: str, size: str) -> bytes:
+        body = {
+            "model": self._model,
+            "prompt": prompt,
+            "size": size,
+            "quality": self._quality,
+            "output_format": self._output_format,
+            "enable_base64_output": False,
+            "enable_sync_mode": False,
+        }
+        resp = requests.post(f"{self._base_url}/model/generateImage",
+                             headers=self._headers(), json=body, timeout=60)
+        if resp.status_code not in (200, 201):
+            raise ValueError(f"Atlas Cloud submit error ({resp.status_code}): "
+                             f"{_sanitize_for_log(resp.text)[:300]}")
+        data = resp.json() or {}
+        task = data.get("data") if isinstance(data.get("data"), dict) else data
+        task_id = (
+            task.get("id") or task.get("request_id") or
+            data.get("id") or data.get("request_id")
+        )
+        if not task_id:
+            output = self._find_output(data)
+            if output:
+                return self._decode_or_download(output)
+            raise ValueError(f"Atlas Cloud: no task id in response: {data}")
+
+        result = self._poll(task_id)
+        output = self._find_output(result)
+        if not output:
+            raise ValueError(f"Atlas Cloud: completed but no image output: {result}")
+        return self._decode_or_download(output)
+
+
 # --- Provider registry ---
 
 PROVIDERS = {
@@ -762,6 +884,7 @@ PROVIDERS = {
     "openrouter": OpenRouterProvider,
     "jimeng": JimengProvider,
     "sub2api": Sub2APIProvider,
+    "atlascloud": AtlasCloudProvider,
 }
 
 
@@ -769,6 +892,8 @@ def _build_provider_from_entry(entry: dict) -> ImageProvider:
     """Build a single ImageProvider from a provider config entry."""
     provider_name = entry.get("provider", "doubao")
     api_key = entry.get("api_key")
+    if not api_key and provider_name == "atlascloud":
+        api_key = os.environ.get("ATLASCLOUD_API_KEY")
 
     if not api_key:
         raise ValueError(f"No api_key for provider '{provider_name}' (key not configured)")
@@ -819,6 +944,12 @@ def _build_provider_chain(config: dict) -> list[ImageProvider]:
 
     # Legacy single-provider format
     api_key = img_cfg.get("api_key")
+    if (
+        not api_key and
+        img_cfg.get("provider") == "atlascloud" and
+        os.environ.get("ATLASCLOUD_API_KEY")
+    ):
+        return [_build_provider_from_entry(img_cfg)]
     if not api_key:
         raise ValueError(
             "image.api_key not set in config.yaml. "
